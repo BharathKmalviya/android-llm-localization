@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "android-localisation"
-version = "1.0.0"
+version = "1.0.1"
 description = "Zero-dependency Android strings.xml translation and verification using LLMs (Gemini, OpenAI, Anthropic, Ollama)."
 readme = "README.md"
 license = { text = "MIT" }
