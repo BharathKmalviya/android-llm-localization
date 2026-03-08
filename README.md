@@ -136,6 +136,8 @@ android-localise verify
 
 Issues and PRs welcome at [github.com/BharathKmalviya/android-llm-localization](https://github.com/BharathKmalviya/android-llm-localization).
 
+Releases are fully automated — bumping the version in `pyproject.toml` and pushing to `master` triggers a build and publish to PyPI automatically.
+
 ---
 
 *Created to make Android localization accessible, free, and completely automated.*
