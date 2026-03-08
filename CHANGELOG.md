@@ -7,6 +7,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.2] - 2026-03-08
+
+### Added
+- `--languages` flag: specify comma-separated language codes (e.g. `hi,es,fr,de`) to auto-create `values-<lang>/` folders and translate without any manual setup
+- Auto-create `strings.xml` inside existing empty locale folders — no longer need to manually create the file before translating
+- Clear log output: shows whether a file is being created (new) or updated (existing) per language
+
+### Changed
+- If no locale directories are found and `--languages` is not set, shows a helpful error message with an example command instead of silently exiting
+
+---
+
 ## [1.0.1] - 2026-03-08
 
 ### Fixed
