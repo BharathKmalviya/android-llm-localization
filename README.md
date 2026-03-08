@@ -4,17 +4,15 @@
 [![Python 3.8+](https://img.shields.io/pypi/pyversions/android-localisation.svg)](https://pypi.org/project/android-localisation/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Translate your Android `strings.xml` into any language using LLMs — Gemini, OpenAI, Anthropic, or a local model. No paid localization service, no CSV exports, no manual copy-paste.
-
-Works entirely from the command line, has zero external dependencies, and fits into any existing Android project without changes to your build setup.
+Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid service, no CSV exports, no copy-paste.
 
 ---
 
-## What it does
+## The problem
 
-Most localization workflows are painful. You export strings, paste them into Google Translate or some dashboard, clean up the output, re-import, and repeat for every language. This tool skips all of that.
+Localizing an Android app the usual way means exporting strings, running them through Google Translate or some dashboard, cleaning up the output, and re-importing — for every language, every update. It's slow, error-prone, and the translations often feel robotic.
 
-Point it at your `res/` directory, give it an API key, and it writes translated `strings.xml` files directly into your locale folders. It also ships two safety tools — one that fixes common LLM formatting mistakes, and one that verifies format specifiers like `%1$s` won't crash your app at runtime.
+This tool does it differently. It reads your `strings.xml`, sends it to an LLM with context about your app, and writes the translated files directly into your project. The model understands UI language, keeps format specifiers intact, and produces natural-sounding output rather than word-for-word translations.
 
 ---
 
@@ -24,140 +22,230 @@ Point it at your `res/` directory, give it an API key, and it writes translated 
 pip install android-localisation
 ```
 
+Requires Python 3.8+. No other dependencies.
+
+---
+
+## Quick start
+
+```bash
+# Step 1 — translate
+android-localise translate --api-key YOUR_GEMINI_KEY
+
+# Step 2 — fix any formatting issues the LLM may have introduced
+android-localise fix
+
+# Step 3 — verify nothing will crash at runtime
+android-localise verify
+```
+
+That's the full workflow. Run these three commands after every time you update your English strings.
+
+---
+
+## What happens when you run translate
+
+When you run `android-localise translate --api-key YOUR_KEY`, here's exactly what it does:
+
+1. Looks for `app/src/main/res/values/strings.xml` — this is your English source
+2. Scans the `res/` directory for any `values-*` folders (e.g. `values-hi`, `values-es`)
+3. For each locale folder, sends your full `strings.xml` to the LLM with a prompt that instructs it to translate naturally, preserve all XML structure, and never touch format specifiers like `%1$s` or `%d`
+4. Writes the translated `strings.xml` directly into each locale folder
+5. Waits 5 seconds between each language request to avoid hitting API rate limits
+
+**Defaults used when you don't specify anything:**
+
+| What | Default |
+|---|---|
+| Provider | Gemini |
+| Model | `gemini-2.5-flash` |
+| Source directory | `app/src/main/res` |
+| Delay between requests | 5 seconds |
+| App context | none (generic prompt) |
+
+Nothing is modified unless the translation comes back with valid XML. If a request fails, that language is skipped and logged — other languages continue.
+
 ---
 
 ## Setup
 
-Create locale folders for the languages you want. The tool looks for any `values-*` directory and treats it as a translation target.
+Before running translate, create empty folders for each language you want inside your `res/` directory:
 
 ```
 app/src/main/res/
-├── values/               ← your English source
+├── values/               ← your English source (must exist)
 │   └── strings.xml
-├── values-hi/            ← Hindi (create empty)
-├── values-es/            ← Spanish (create empty)
-└── values-fr/            ← French (create empty)
+├── values-hi/            ← Hindi
+├── values-es/            ← Spanish
+├── values-fr/            ← French
+├── values-de/            ← German
+└── values-zh-rCN/        ← Chinese (Simplified)
 ```
 
-Get an API key. [Google Gemini AI Studio](https://aistudio.google.com/) has a free tier that works well for most apps.
+The tool only translates into folders that already exist. Create the folder, run translate, done.
+
+**Get a free API key:** [Google Gemini AI Studio](https://aistudio.google.com/) → Get API Key. The free tier handles most apps without hitting limits.
 
 ---
 
-## Usage
+## Commands
 
-### Translate
+### `translate`
 
 ```bash
 android-localise translate --api-key YOUR_KEY
 ```
 
-Reads `values/strings.xml` and writes translated files into every `values-*` folder it finds.
-
-Add `--app-context` to give the model a hint about what your app does — this noticeably improves translation quality for domain-specific terms:
+Add `--app-context` with a one-line description of your app. This meaningfully improves translation quality — the model knows whether "record" means a music track, a health log, or a database entry:
 
 ```bash
-android-localise translate --api-key YOUR_KEY --app-context "a personal finance and budgeting app"
+android-localise translate \
+  --api-key YOUR_KEY \
+  --app-context "a workout tracking app for gym beginners"
 ```
 
-**All options:**
+**All flags:**
 
-| Flag | Description | Default |
+| Flag | What it does | Default |
 |---|---|---|
-| `--api-key` | API key. Can also be set via env var | — |
-| `--provider` | `gemini`, `openai`, `anthropic`, or `custom` | `gemini` |
-| `--model` | Any model name the provider supports | provider default |
+| `--api-key` | Your API key | reads from env var |
+| `--provider` | Which AI to use: `gemini` `openai` `anthropic` `custom` | `gemini` |
+| `--model` | Specific model to use | see [Providers](#providers) |
 | `--app-context` | One-line description of your app | — |
-| `--res-dir` | Path to your `res/` directory | `app/src/main/res` |
-| `--base-url` | Endpoint URL for custom/local providers | — |
-| `--sleep` | Delay between requests in seconds | `5.0` |
+| `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
+| `--base-url` | API endpoint for local/custom providers | — |
+| `--sleep` | Seconds to wait between language requests | `5.0` |
 
-### Fix
+---
+
+### `fix`
 
 ```bash
 android-localise fix
 ```
 
-LLMs occasionally produce curly apostrophes, unescaped quotes, or malformed `%` signs that cause AAPT2 build failures. This command scans all translated files and corrects them.
+LLMs occasionally produce output that looks correct but breaks the Android build — curly apostrophes (`'`) instead of escaped ones (`\'`), unescaped double quotes, or mangled `%` signs. This command scans every translated `strings.xml` and corrects these silently.
 
-### Verify
+Always run this before `verify` and before building.
+
+---
+
+### `verify`
 
 ```bash
 android-localise verify
 ```
 
-Compiles a Java verifier and dry-runs `String.format()` against every translated string. Catches corrupted format specifiers (`%1$s` → `%s`, etc.) that would throw `UnknownFormatConversionException` at runtime. Requires `javac` in your PATH — run from Android Studio's terminal if needed.
+Takes every translated string that contains a format specifier (`%1$s`, `%d`, `%1$f`, etc.) and calls `String.format()` on it using Java's actual runtime. If a translated string would throw `UnknownFormatConversionException` or `MissingFormatArgumentException` in your app, this catches it before your users do.
 
-### List available models
+Requires `javac` in your PATH. If you don't have it system-wide, run this from the Terminal tab inside Android Studio — it ships with a JDK.
+
+---
+
+### `models`
 
 ```bash
-android-localise models
+android-localise models                  # all providers
+android-localise models --provider openai  # one provider
 ```
+
+Lists every available model and fallback for each provider.
 
 ---
 
 ## Providers
 
-| Provider | Default model | Env var |
-|---|---|---|
-| `gemini` _(default)_ | `gemini-2.5-flash` | `GEMINI_API_KEY` |
-| `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-3-5-haiku-latest` | `ANTHROPIC_API_KEY` |
-| `custom` | specify with `--model` | — |
+By default the tool uses Gemini with `gemini-2.5-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`.
 
-Each provider has a fallback chain — if the default model is unavailable, the next one is tried automatically. Use `--model` to pin a specific model and skip fallbacks entirely.
+| Provider | Default model | Fallbacks | API key env var |
+|---|---|---|---|
+| `gemini` _(default)_ | `gemini-2.5-flash` | `gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-pro` | `GEMINI_API_KEY` |
+| `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
+| `custom` | set with `--model` | none | — |
 
-**Using a local model (Ollama, LM Studio):**
+If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
 
+**Using OpenAI:**
 ```bash
+android-localise translate --provider openai --api-key YOUR_KEY
+android-localise translate --provider openai --model gpt-4o --api-key YOUR_KEY
+```
+
+**Using Anthropic:**
+```bash
+android-localise translate --provider anthropic --api-key YOUR_KEY
+```
+
+**Using a local model (no API key needed):**
+```bash
+# Ollama
 android-localise translate \
   --provider custom \
   --base-url http://localhost:11434/v1/chat/completions \
   --model llama3
+
+# LM Studio
+android-localise translate \
+  --provider custom \
+  --base-url http://localhost:1234/v1/chat/completions \
+  --model mistral
 ```
-
-No API key required for local providers.
-
----
-
-## Recommended workflow
-
-```bash
-# 1. Update your English strings.xml
-# 2. Create empty values-<lang>/ folders for new languages
-
-android-localise translate --api-key YOUR_KEY --app-context "your app description"
-android-localise fix
-android-localise verify
-
-# 3. Build your app
-```
-
-Run `fix` before `verify` — the fixer corrects formatting issues that the verifier would otherwise flag.
 
 ---
 
 ## Environment variables
 
-Instead of passing `--api-key` every time, export the key for your provider:
+Set your API key as an env variable so you don't have to pass it every time:
 
 ```bash
-export GEMINI_API_KEY=your_key       # or set in your shell profile
+# macOS / Linux
+export GEMINI_API_KEY=your_key
+
+# Windows PowerShell
+$env:GEMINI_API_KEY = "your_key"
+```
+
+Then just run:
+```bash
 android-localise translate
 ```
 
-| Variable | Provider |
+| Variable | Used by |
 |---|---|
-| `GEMINI_API_KEY` | Gemini |
-| `OPENAI_API_KEY` | OpenAI / custom |
-| `ANTHROPIC_API_KEY` | Anthropic |
+| `GEMINI_API_KEY` | `--provider gemini` |
+| `OPENAI_API_KEY` | `--provider openai` and `--provider custom` |
+| `ANTHROPIC_API_KEY` | `--provider anthropic` |
+
+---
+
+## Full workflow example
+
+```bash
+# First time setup — create locale folders
+mkdir -p app/src/main/res/values-hi
+mkdir -p app/src/main/res/values-es
+mkdir -p app/src/main/res/values-de
+
+# Set your key once
+export GEMINI_API_KEY=your_key
+
+# Translate, fix, verify
+android-localise translate --app-context "a habit tracking app"
+android-localise fix
+android-localise verify
+
+# Build your app as usual
+./gradlew assembleDebug
+```
+
+After this, whenever you add or change strings in your English `strings.xml`, run the same three commands again. Existing translated strings will be overwritten with fresh translations.
 
 ---
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Open an issue first for anything beyond small fixes — it helps avoid duplicate work.
-
-To run locally:
+Bug reports and pull requests are welcome. For larger changes, open an issue first.
 
 ```bash
 git clone https://github.com/BharathKmalviya/android-llm-localization
@@ -165,7 +253,7 @@ cd android-llm-localization
 pip install -e .
 ```
 
-Releases are automated. Bumping the version in `pyproject.toml` and `__init__.py`, updating `CHANGELOG.md`, and pushing to `master` triggers a build and publish to PyPI via GitHub Actions.
+Releases are automated via GitHub Actions — bump the version in `pyproject.toml` and `__init__.py`, update `CHANGELOG.md`, and push to `master`.
 
 ---
 
