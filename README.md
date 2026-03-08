@@ -48,8 +48,8 @@ That's the full workflow. Run these three commands after every time you update y
 When you run `android-localise translate --api-key YOUR_KEY`, here's exactly what it does:
 
 1. Looks for `app/src/main/res/values/strings.xml` — this is your English source
-2. Scans the `res/` directory for any `values-*` folders (e.g. `values-hi`, `values-es`)
-3. For each locale folder, sends your full `strings.xml` to the LLM with a prompt that instructs it to translate naturally, preserve all XML structure, and never touch format specifiers like `%1$s` or `%d`
+2. If `--languages` is provided, creates any missing `values-<lang>/` folders automatically. Otherwise scans the `res/` directory for existing `values-*` folders
+3. For each locale, if `strings.xml` doesn't exist it creates the file first, then sends your full English XML to the LLM with a prompt that instructs it to translate naturally, preserve all XML structure, and never touch format specifiers like `%1$s` or `%d`
 4. Writes the translated `strings.xml` directly into each locale folder
 5. Waits 5 seconds between each language request to avoid hitting API rate limits
 
@@ -69,20 +69,26 @@ Nothing is modified unless the translation comes back with valid XML. If a reque
 
 ## Setup
 
-Before running translate, create empty folders for each language you want inside your `res/` directory:
+The only requirement is that `app/src/main/res/values/strings.xml` exists — your English source file.
 
+For target languages, you have two options:
+
+**Option A — let the tool create everything:**
+```bash
+android-localise translate --api-key YOUR_KEY --languages hi,es,fr,de
+```
+This creates `values-hi/`, `values-es/`, `values-fr/`, `values-de/` folders and their `strings.xml` files automatically, then translates into each one.
+
+**Option B — pre-create folders yourself:**
 ```
 app/src/main/res/
 ├── values/               ← your English source (must exist)
 │   └── strings.xml
-├── values-hi/            ← Hindi
-├── values-es/            ← Spanish
-├── values-fr/            ← French
-├── values-de/            ← German
-└── values-zh-rCN/        ← Chinese (Simplified)
+├── values-hi/            ← empty folder is fine
+├── values-es/
+└── values-fr/
 ```
-
-The tool only translates into folders that already exist. Create the folder, run translate, done.
+Run `android-localise translate --api-key YOUR_KEY` and it picks up any `values-*` folder it finds, creating `strings.xml` inside each one if it doesn't exist yet.
 
 **Get a free API key:** [Google Gemini AI Studio](https://aistudio.google.com/) → Get API Key. The free tier handles most apps without hitting limits.
 
@@ -111,6 +117,7 @@ android-localise translate \
 | `--api-key` | Your API key | reads from env var |
 | `--provider` | Which AI to use: `gemini` `openai` `anthropic` `custom` | `gemini` |
 | `--model` | Specific model to use | see [Providers](#providers) |
+| `--languages` | Comma-separated language codes — creates folders and files automatically | — |
 | `--app-context` | One-line description of your app | — |
 | `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
 | `--base-url` | API endpoint for local/custom providers | — |
