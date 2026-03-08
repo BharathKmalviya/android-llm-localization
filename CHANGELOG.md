@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.3] - 2026-03-08
+
+### Fixed
+- Translation failures now show exactly why they failed — API error, missing `<resources>` tag, or missing `</resources>` closing tag — with a response preview so you can debug without guessing
+
+---
+
 ## [1.0.2] - 2026-03-08
 
 ### Added
