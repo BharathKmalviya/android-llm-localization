@@ -31,3 +31,6 @@ Thumbs.db
 .vscode/
 *.swp
 .claude/
+
+# Local testing only
+test/
