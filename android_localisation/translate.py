@@ -8,6 +8,28 @@ import json
 DEFAULT_RES_DIR = "app/src/main/res"
 API_TIMEOUT = 60  # seconds
 
+# Ordered list of models per provider.
+# First entry = default. Rest = automatic fallbacks (used only when user hasn't pinned a model).
+PROVIDER_MODELS = {
+    "gemini": [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    ],
+    "openai": [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "gpt-3.5-turbo",
+    ],
+    "anthropic": [
+        "claude-3-5-haiku-latest",
+        "claude-3-5-sonnet-latest",
+        "claude-3-opus-latest",
+    ],
+    "custom": [],  # user must specify --model
+}
+
 
 def get_target_directories(res_dir):
     """Finds all values-* directories inside the provided res/ directory."""
@@ -66,6 +88,17 @@ def _read_error_body(e):
         return "(could not read error body)"
 
 
+def _is_model_not_found(http_code, body):
+    """Returns True if the error clearly means the model doesn't exist."""
+    if http_code == 404:
+        return True
+    body_lower = body.lower()
+    return any(phrase in body_lower for phrase in [
+        "model not found", "model_not_found", "does not exist",
+        "no such model", "unknown model", "invalid model",
+    ])
+
+
 def call_gemini(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
@@ -77,11 +110,13 @@ def call_gemini(api_key, model, prompt):
             candidates = result.get("candidates", [])
             if not candidates:
                 print("  ❌ Gemini returned no candidates.")
-                return None
-            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                return None, False
+            return result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", ""), False
     except urllib.error.HTTPError as e:
-        print(f"  ❌ Gemini API Error: {e.code} - {_read_error_body(e)}")
-        return None
+        body = _read_error_body(e)
+        model_gone = _is_model_not_found(e.code, body)
+        print(f"  ❌ Gemini API Error: {e.code} - {body}")
+        return None, model_gone
 
 
 def call_openai_compatible(api_key, base_url, model, prompt):
@@ -100,11 +135,13 @@ def call_openai_compatible(api_key, base_url, model, prompt):
             choices = result.get("choices", [])
             if not choices:
                 print("  ❌ OpenAI returned no choices.")
-                return None
-            return choices[0].get("message", {}).get("content", "")
+                return None, False
+            return choices[0].get("message", {}).get("content", ""), False
     except urllib.error.HTTPError as e:
-        print(f"  ❌ OpenAI (compatible) API Error: {e.code} - {_read_error_body(e)}")
-        return None
+        body = _read_error_body(e)
+        model_gone = _is_model_not_found(e.code, body)
+        print(f"  ❌ OpenAI (compatible) API Error: {e.code} - {body}")
+        return None, model_gone
 
 
 def call_anthropic(api_key, model, prompt):
@@ -126,34 +163,57 @@ def call_anthropic(api_key, model, prompt):
             content = result.get("content", [])
             if not content:
                 print("  ❌ Anthropic returned no content.")
-                return None
-            return content[0].get("text", "")
+                return None, False
+            return content[0].get("text", ""), False
     except urllib.error.HTTPError as e:
-        print(f"  ❌ Anthropic API Error: {e.code} - {_read_error_body(e)}")
-        return None
+        body = _read_error_body(e)
+        model_gone = _is_model_not_found(e.code, body)
+        print(f"  ❌ Anthropic API Error: {e.code} - {body}")
+        return None, model_gone
 
 
-def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context, base_url=None):
-    """Calls the selected provider API to translate the XML into the target language."""
-    prompt = build_prompt(source_xml, target_folder_name, app_context)
+def _call_provider(provider, api_key, model, prompt, base_url=None):
+    """Dispatches to the right API. Returns (text, model_not_found)."""
     if provider == "gemini":
-        result = call_gemini(api_key, model, prompt)
+        return call_gemini(api_key, model, prompt)
     elif provider == "openai":
         url = base_url if base_url else "https://api.openai.com/v1/chat/completions"
-        result = call_openai_compatible(api_key, url, model, prompt)
+        return call_openai_compatible(api_key, url, model, prompt)
     elif provider == "anthropic":
-        result = call_anthropic(api_key, model, prompt)
+        return call_anthropic(api_key, model, prompt)
     else:
         print(f"❌ Unknown provider: {provider}")
-        return None
-    return clean_xml_response(result)
+        return None, False
+
+
+def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context,
+                  base_url=None, fallback_models=None):
+    """
+    Calls the selected provider API to translate the XML.
+    If the model is not found and fallback_models are provided, retries with the next one.
+    Returns (translated_xml, model_used).
+    """
+    prompt = build_prompt(source_xml, target_folder_name, app_context)
+    models_to_try = [model] + (fallback_models or [])
+
+    for attempt_model in models_to_try:
+        if attempt_model != model:
+            print(f"  ↩️  Falling back to model: {attempt_model}")
+        result, model_not_found = _call_provider(provider, api_key, attempt_model, prompt, base_url)
+        if result is not None:
+            return clean_xml_response(result), attempt_model
+        if not model_not_found:
+            # Failed for a non-model reason (auth, quota, network) — don't try fallbacks
+            return None, attempt_model
+
+    return None, models_to_try[-1]
 
 
 def _parse_args(args=None):
     parser = argparse.ArgumentParser(description="Translate Android strings.xml using LLMs.")
     parser.add_argument("--res-dir", default=DEFAULT_RES_DIR)
     parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini")
-    parser.add_argument("--model")
+    parser.add_argument("--model", help="Any model name for the chosen provider. Uses provider default if not set.")
     parser.add_argument("--api-key")
     parser.add_argument("--base-url")
     parser.add_argument("--app-context")
@@ -162,34 +222,39 @@ def _parse_args(args=None):
 
 
 def main(args=None):
-    # Accept either a pre-parsed Namespace (from cli.py) or raw argv list
     if args is None or isinstance(args, list):
         args = _parse_args(args)
 
-    # Resolve model default
-    model = args.model
-    if not model:
-        if args.provider == "gemini":       model = "gemini-2.5-flash"
-        elif args.provider == "openai":     model = "gpt-4o-mini"
-        elif args.provider == "anthropic":  model = "claude-3-5-sonnet-latest"
-        elif args.provider == "custom":
+    provider = args.provider
+    user_pinned_model = bool(args.model)  # True if user explicitly chose a model
+
+    # Resolve model + fallback chain
+    if args.model:
+        # User pinned a specific model — use it, no fallbacks
+        model = args.model
+        fallback_models = []
+    else:
+        if provider == "custom":
             print("❌ ERROR: You must specify --model when using a custom provider.")
             return
+        model_list = PROVIDER_MODELS.get(provider, [])
+        model = model_list[0] if model_list else None
+        fallback_models = model_list[1:]
 
     # Resolve API key
     api_key = args.api_key
     if not api_key:
-        if args.provider == "gemini":                   api_key = os.environ.get("GEMINI_API_KEY")
-        elif args.provider in ("openai", "custom"):     api_key = os.environ.get("OPENAI_API_KEY")
-        elif args.provider == "anthropic":              api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if provider == "gemini":                  api_key = os.environ.get("GEMINI_API_KEY")
+        elif provider in ("openai", "custom"):    api_key = os.environ.get("OPENAI_API_KEY")
+        elif provider == "anthropic":             api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             api_key = os.environ.get("API_KEY")
 
-    if not api_key and args.provider != "custom":
+    if not api_key and provider != "custom":
         print("❌ ERROR: Please provide an API key via --api-key or the appropriate environment variable.")
         return
 
-    if args.provider == "custom" and not args.base_url:
+    if provider == "custom" and not args.base_url:
         print("❌ ERROR: You must provide --base-url when using a custom provider.")
         return
 
@@ -209,23 +274,26 @@ def main(args=None):
         return
 
     print(f"🌍 Found {len(target_dirs)} language directories.")
-    print(f"🤖 Using Provider: {args.provider.upper()} | Model: {model}")
+    fallback_note = "" if user_pinned_model else f" (fallbacks: {', '.join(fallback_models)})" if fallback_models else ""
+    print(f"🤖 Provider: {provider.upper()} | Model: {model}{fallback_note}")
+
+    actual_provider = "openai" if provider == "custom" else provider
 
     for folder in target_dirs:
         target_path = os.path.join(res_dir, folder, "strings.xml")
         print(f"⏳ Translating for {folder}...")
 
-        provider_name = "openai" if args.provider == "custom" else args.provider
-        translated_xml = translate_xml(
-            provider_name, api_key, model, source_xml,
-            folder, args.app_context, args.base_url
+        translated_xml, used_model = translate_xml(
+            actual_provider, api_key, model, source_xml,
+            folder, args.app_context, args.base_url, fallback_models
         )
 
         if translated_xml and "<resources>" in translated_xml and "</resources>" in translated_xml:
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(translated_xml)
-            print(f"✅ Saved translated strings.xml to {folder}")
+            suffix = f" (via {used_model})" if used_model != model else ""
+            print(f"✅ Saved translated strings.xml to {folder}{suffix}")
         else:
             print(f"⚠️  Failed or got invalid XML for {folder}. Skipping.")
 
