@@ -40,6 +40,7 @@ android-localisation-scripts/
 
 ## Key Rules
 
+- **Always update README.md when code changes.** Any new flag, changed default, new behaviour, or removed feature must be reflected in the README before committing. The README is the only user-facing documentation — if it's out of date, users are working blind. This applies to every change, no matter how small.
 - **Zero external dependencies.** Only Python stdlib (`urllib`, `json`, `re`, `subprocess`, `argparse`, etc.). Never add third-party imports.
 - **Version must be in sync** in two places: `pyproject.toml` and `android_localisation/__init__.py`.
 - **Never duplicate logic.** All script logic lives in `android_localisation/`. There are no root-level standalone scripts.
