@@ -90,22 +90,28 @@ To add a new provider or update model lists, edit `PROVIDER_MODELS` in `translat
 
 ## How to Release a New Version
 
+The entire build and publish process is automated via GitHub Actions. Just push — no local build or manual tagging needed.
+
 1. Make and commit all changes
 2. Bump version in **both**:
    - `pyproject.toml` → `version = "x.x.x"`
    - `android_localisation/__init__.py` → `__version__ = "x.x.x"`
 3. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new `[x.x.x] - YYYY-MM-DD` section
-4. Commit:
+4. Commit and push:
    ```bash
    git add .
    git commit -m "Release vX.X.X"
+   git push
    ```
-5. Tag and push:
-   ```bash
-   git tag vX.X.X
-   git push && git push --tags
-   ```
-6. GitHub Actions (`publish.yml`) automatically builds and publishes to PyPI.
+
+GitHub Actions (`publish.yml`) will automatically:
+- Detect the new version in `pyproject.toml`
+- Create the git tag
+- Build the package
+- Publish to PyPI
+- Create a GitHub Release with `CHANGELOG.md` as release notes
+
+If the version hasn't changed, the workflow skips publishing silently.
 
 ---
 
