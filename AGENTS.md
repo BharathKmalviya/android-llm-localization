@@ -107,6 +107,35 @@ To add a provider: add it to `PROVIDER_MODELS`, add it to `choices` in `_parse_a
 
 ---
 
+## Agent behaviour — non-negotiable defaults
+
+These apply automatically on every task. The user should never have to ask for any of these.
+
+**After any code change:**
+- Update `README.md` to reflect the change — new flags, changed defaults, new behaviour, removed features
+- Update `CHANGELOG.md` with a new version entry describing what changed and why
+- Bump version in both `pyproject.toml` and `android_localisation/__init__.py`
+- Commit and push — the pipeline publishes to PyPI automatically
+
+**After any README or docs change only (no code changed):**
+- Commit and push — no version bump needed
+
+**After adding a new CLI flag:**
+- Add it to the flags table in `README.md`
+- Add it to the "All `translate` flags" table in `AGENTS.md` if it's a translate flag
+- Document any new default behaviour in the "What happens when you run translate" section in README
+
+**After any release:**
+- Verify GitHub Actions ran successfully at https://github.com/BharathKmalviya/android-llm-localization/actions
+- Confirm the new version appears on PyPI
+
+**General:**
+- Never leave the repo in a state where README, CHANGELOG, and code are out of sync
+- Never leave uncommitted changes after completing a task — always commit and push
+- If something breaks, fix it and push in the same session — don't leave broken state
+
+---
+
 ## Code rules — read before touching anything
 
 - **Zero external dependencies.** Only Python stdlib. Never add a `pip install` import.
