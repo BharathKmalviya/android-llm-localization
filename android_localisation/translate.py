@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import argparse
 import urllib.request
@@ -70,19 +71,24 @@ def read_source_xml(source_path):
 
 def build_prompt(source_xml, target_folder_name, app_context):
     context_str = f"an Android app ({app_context})" if app_context else "an Android application"
-    return f"""You are a professional mobile app localization expert.
+    return f"""You are a professional Android localization expert.
 
-I am sending you the complete English `strings.xml` for {context_str}.
-Your job is to translate it into the language corresponding to the Android resource directory: `{target_folder_name}`.
-For example, `values-hi` is Hindi, `values-es-rES` is Spanish (Spain), `values-zh-rTW` is Traditional Chinese, etc.
+Translate the English `strings.xml` below for {context_str} into the language for Android resource directory: `{target_folder_name}`.
+For example, `values-hi` is Hindi, `values-es-rES` is Spanish (Spain), `values-zh-rTW` is Traditional Chinese, `values-ar` is Arabic, etc.
 
 STRICT GUIDELINES:
-1. Preserve the exact meaning and intent of the English text.
-2. The language must be clear, natural, human-sounding, and understandable by all users (from rural to tier-1 cities).
-3. Do not sound like a machine translation. Use simple, everyday mobile UI language.
-4. NEVER modify string keys, XML structure, placeholders (like %s, %1$d), escape characters, \\n line breaks, or HTML tags.
-5. Keep it short and UI friendly.
-6. Return ONLY the raw updated XML content. Do not add markdown formatting like ```xml or any conversational text.
+1. Translate only the string values — never the keys, XML tags, or attributes.
+2. Use natural, human-sounding language. Simple everyday mobile UI tone. Not robotic or word-for-word.
+3. Preserve ALL placeholders exactly as-is: %s, %d, %1$s, %1$d, %2$s, etc.
+4. Preserve ALL escape sequences exactly as-is: \\n, \\', \\", \\\\.
+5. Preserve ALL HTML tags exactly as-is: <b>, <i>, <u>, <br/>, etc.
+6. Apostrophes in translated text MUST be escaped as \\' — never use a raw ' or a curly apostrophe.
+7. The output MUST use standard Android strings.xml format:
+   - Start with: <?xml version="1.0" encoding="utf-8"?>
+   - Use plain <resources> with NO namespace attributes (no xmlns:xliff or any other xmlns)
+   - Every string on its own line: <string name="key">translated value</string>
+   - No CDATA, no extra attributes on <string> tags except name and translatable
+8. Return ONLY the raw XML. No markdown, no code fences, no explanation.
 
 SOURCE XML:
 {source_xml}
@@ -93,13 +99,20 @@ def clean_xml_response(result):
     if not result:
         return ""
     result = result.strip()
+
+    # Strip markdown code fences
     if result.startswith("```xml"):
         result = result[6:]
     if result.startswith("```"):
         result = result[3:]
     if result.endswith("```"):
         result = result[:-3]
-    return result.strip()
+    result = result.strip()
+
+    # Strip any xmlns namespace attributes from <resources> tag — not valid in standard Android strings.xml
+    result = re.sub(r'(<resources)\s+[^>]*?(>)', r'\1\2', result)
+
+    return result
 
 
 def _read_error_body(e):

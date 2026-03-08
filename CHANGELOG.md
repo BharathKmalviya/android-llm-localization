@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.4] - 2026-03-09
+
+### Fixed
+- **Verifier false positives**: `%%` (escaped percent) in strings like `%1$d%% completed` was misread as a `%c` format specifier — now stripped before regex scanning
+- **Verifier type mismatch crashes**: type-aware argument building now correctly maps `%f`/`%e`/`%g` → Double, `%c` → Character, `%b` → Boolean, supporting any number of format args
+- **Verifier `formatted="false"` strings**: strings with this attribute are now skipped — their `%` signs are literal, not format specifiers
+- **`translate.py` NameError**: missing `import re` caused a crash in `clean_xml_response()` when stripping xmlns attributes from `<resources>` tag
+- **`fix.py` corrupting `formatted="false"` strings**: the fixer now skips strings marked `formatted="false"` — previously it escaped their literal `%` signs to `%%`, corrupting the output
+
+### Changed
+- Translation prompt now explicitly forbids xmlns namespaces in `<resources>`, requires `\'` apostrophe escaping, and forbids CDATA
+- `clean_xml_response()` strips any xmlns attributes from `<resources>` tag as a safety net
+
+---
+
 ## [1.0.3] - 2026-03-08
 
 ### Fixed
