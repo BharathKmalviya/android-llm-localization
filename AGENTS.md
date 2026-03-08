@@ -130,9 +130,11 @@ These apply automatically on every task. The user should never have to ask for a
 - Confirm the new version appears on PyPI
 
 **General:**
+- Always work on the `dev` branch — never commit directly to `master`
+- Never push unless the user explicitly says to push
 - Never leave the repo in a state where README, CHANGELOG, and code are out of sync
-- Never leave uncommitted changes after completing a task — always commit and push
-- If something breaks, fix it and push in the same session — don't leave broken state
+- Always commit changes locally after completing a task — push only when asked
+- If something breaks, fix it in the same session before stopping
 
 ---
 
@@ -219,6 +221,49 @@ GitHub Actions will detect the version bump, auto-tag the commit, build the pack
 
 ---
 
+## Branching workflow
+
+This repo uses a `dev` → `master` workflow. **Never push directly to `master`.**
+
+| Branch | Purpose |
+|---|---|
+| `dev` | All day-to-day changes — features, fixes, docs, refactors |
+| `master` | Production only — merged into via PR when ready to release |
+
+**Day-to-day (all changes go to `dev`):**
+```bash
+git checkout dev
+# make changes
+git add .
+git commit -m "your message"
+# DO NOT push unless the user says to
+```
+
+**When the user says to push:**
+```bash
+git push origin dev
+```
+
+**When the user says to release:**
+1. Bump version in `pyproject.toml` and `__init__.py`
+2. Update `CHANGELOG.md`
+3. Commit on `dev` and push
+4. Create a PR from `dev` → `master`:
+   ```bash
+   gh pr create --base master --head dev --title "Release vX.X.X" --body "See CHANGELOG.md"
+   ```
+5. Tell the user the PR URL — they review and merge
+6. After merge, GitHub Actions auto-publishes to PyPI
+
+**After a release merge, sync `dev` with `master`:**
+```bash
+git checkout dev
+git merge master
+git push origin dev
+```
+
+---
+
 ## PR / commit instructions
 
 - Commit message format: `<verb> <what> — <why if not obvious>`
@@ -227,6 +272,7 @@ GitHub Actions will detect the version bump, auto-tag the commit, build the pack
 - For releases: `Release vX.X.X — one-line summary of what changed`
 - Always run a local test before pushing a release commit
 - Keep commits focused — one logical change per commit
+- **Do not push after every small change** — batch related changes and push when the user asks
 
 ---
 
