@@ -323,7 +323,7 @@ def main(args=None):
             folder, args.app_context, args.base_url, fallback_models
         )
 
-        if translated_xml and "<resources>" in translated_xml and "</resources>" in translated_xml:
+        if translated_xml and "<resources" in translated_xml and "</resources>" in translated_xml:
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(translated_xml)
@@ -333,7 +333,7 @@ def main(args=None):
         else:
             if translated_xml is None:
                 print(f"⚠️  [{folder}] API call failed — see error above. Skipping.")
-            elif "<resources>" not in translated_xml:
+            elif "<resources" not in translated_xml:
                 preview = translated_xml[:200].replace("\n", " ") if translated_xml else "(empty response)"
                 print(f"⚠️  [{folder}] Response missing <resources> tag. Skipping.")
                 print(f"    Response preview: {preview}")
