@@ -331,7 +331,14 @@ def main(args=None):
             action = "Created" if is_new_file else "Updated"
             print(f"✅ {action} {folder}/strings.xml{suffix}")
         else:
-            print(f"⚠️  Failed or got invalid XML for {folder}. Skipping.")
+            if translated_xml is None:
+                print(f"⚠️  [{folder}] API call failed — see error above. Skipping.")
+            elif "<resources>" not in translated_xml:
+                preview = translated_xml[:200].replace("\n", " ") if translated_xml else "(empty response)"
+                print(f"⚠️  [{folder}] Response missing <resources> tag. Skipping.")
+                print(f"    Response preview: {preview}")
+            else:
+                print(f"⚠️  [{folder}] Response missing </resources> closing tag. Skipping.")
 
         if args.sleep > 0:
             time.sleep(args.sleep)
