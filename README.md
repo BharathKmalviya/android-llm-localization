@@ -1,7 +1,7 @@
 # android-llm-localization
 
 [![PyPI version](https://img.shields.io/pypi/v/android-localisation.svg)](https://pypi.org/project/android-localisation/)
-[![Python 3.8+](https://img.shields.io/pypi/pyversions/android-localisation.svg)](https://pypi.org/project/android-localisation/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://pypi.org/project/android-localisation/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid service, no CSV exports, no copy-paste.
