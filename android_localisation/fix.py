@@ -65,7 +65,11 @@ def main(args=None):
             content = f.read()
 
         def fix_match(m):
-            return m.group(1) + _fix_text(m.group(2)) + m.group(3)
+            opening_tag = m.group(1)
+            # Skip strings marked formatted="false" — their % signs are literal, not specifiers
+            if 'formatted="false"' in opening_tag.lower() or "formatted='false'" in opening_tag.lower():
+                return m.group(0)
+            return opening_tag + _fix_text(m.group(2)) + m.group(3)
 
         new_content = re.sub(
             r'(<string[^>]*name="[^"]*"[^>]*>)(.*?)(</string>)',
