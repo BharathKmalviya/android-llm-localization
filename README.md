@@ -1,4 +1,8 @@
-# Android Localization AI Scripts
+# Android LLM Localization
+
+[![PyPI version](https://img.shields.io/pypi/v/android-localisation.svg)](https://pypi.org/project/android-localisation/)
+[![Python 3.8+](https://img.shields.io/pypi/pyversions/android-localisation.svg)](https://pypi.org/project/android-localisation/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/BharathKmalviya/android-llm-localization/blob/master/LICENSE)
 
 A zero-dependency Python tool to translate, fix, and verify Android `strings.xml` resources using Large Language Models (LLMs) — Gemini, OpenAI, Anthropic (Claude), or any local model via Ollama.
 
@@ -123,6 +127,14 @@ android-localise verify
 | `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | `anthropic` | `claude-3-5-sonnet-latest` | `ANTHROPIC_API_KEY` |
 | `custom` | *(must specify)* | `OPENAI_API_KEY` or none |
+
+---
+
+---
+
+## Contributing
+
+Issues and PRs welcome at [github.com/BharathKmalviya/android-llm-localization](https://github.com/BharathKmalviya/android-llm-localization).
 
 ---
 
