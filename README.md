@@ -250,6 +250,12 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 
 ---
 
+## Roadmap
+
+- [ ] **iOS support** — translate `Localizable.strings` and `Localizable.xcstrings` for iOS/macOS apps. The LLM prompt and provider logic is already in place — it mainly needs a parser for Apple's strings format and the right folder structure (`<lang>.lproj/`). Good first contribution if you're familiar with iOS projects.
+
+---
+
 ## Contributing
 
 Bug reports and pull requests are welcome. For larger changes, open an issue first.
