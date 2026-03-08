@@ -31,6 +31,7 @@ def main():
     translate_parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
     translate_parser.add_argument("--app-context", help="Short description of your app for better translations")
     translate_parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
+    translate_parser.add_argument("--languages", help="Comma-separated language codes, e.g. hi,es,fr,de — creates folders and strings.xml automatically")
 
     # --- fix ---
     fix_parser = subparsers.add_parser("fix", help="Fix XML escaping issues in translated strings.xml files")

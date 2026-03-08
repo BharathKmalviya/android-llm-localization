@@ -42,6 +42,27 @@ def get_target_directories(res_dir):
     return sorted(dirs)
 
 
+def ensure_locale_dirs(res_dir, languages):
+    """
+    Creates values-<lang> directories for each language code in the list.
+    Returns the list of folder names created or already existing.
+    """
+    created = []
+    for lang in languages:
+        lang = lang.strip()
+        if not lang:
+            continue
+        folder = f"values-{lang}" if not lang.startswith("values-") else lang
+        folder_path = os.path.join(res_dir, folder)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path, exist_ok=True)
+            print(f"📁 Created {folder}/")
+            created.append(folder)
+        else:
+            created.append(folder)
+    return created
+
+
 def read_source_xml(source_path):
     with open(source_path, "r", encoding="utf-8") as f:
         return f.read()
@@ -218,6 +239,7 @@ def _parse_args(args=None):
     parser.add_argument("--base-url")
     parser.add_argument("--app-context")
     parser.add_argument("--sleep", type=float, default=5.0)
+    parser.add_argument("--languages", help="Comma-separated language codes to translate into, e.g. hi,es,fr,de. Creates folders automatically if they don't exist.")
     return parser.parse_args(args)
 
 
@@ -267,10 +289,18 @@ def main(args=None):
         return
 
     source_xml = read_source_xml(source_strings_xml)
-    target_dirs = get_target_directories(res_dir)
+
+    # Build target directory list — from --languages flag or by scanning res_dir
+    if args.languages:
+        lang_codes = [l.strip() for l in args.languages.split(",") if l.strip()]
+        target_dirs = ensure_locale_dirs(res_dir, lang_codes)
+    else:
+        target_dirs = get_target_directories(res_dir)
 
     if not target_dirs:
-        print(f"⚠️  No values-* localized directories found in {res_dir}")
+        print(f"⚠️  No locale directories found in {res_dir}.")
+        print("    Either create values-<lang>/ folders manually, or use --languages to specify them:")
+        print("    Example: android-localise translate --languages hi,es,fr,de --api-key YOUR_KEY")
         return
 
     print(f"🌍 Found {len(target_dirs)} language directories.")
@@ -281,7 +311,12 @@ def main(args=None):
 
     for folder in target_dirs:
         target_path = os.path.join(res_dir, folder, "strings.xml")
-        print(f"⏳ Translating for {folder}...")
+        is_new_file = not os.path.exists(target_path)
+
+        if is_new_file:
+            print(f"⏳ [{folder}] No strings.xml found — creating and translating...")
+        else:
+            print(f"⏳ [{folder}] Updating existing strings.xml...")
 
         translated_xml, used_model = translate_xml(
             actual_provider, api_key, model, source_xml,
@@ -293,7 +328,8 @@ def main(args=None):
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(translated_xml)
             suffix = f" (via {used_model})" if used_model != model else ""
-            print(f"✅ Saved translated strings.xml to {folder}{suffix}")
+            action = "Created" if is_new_file else "Updated"
+            print(f"✅ {action} {folder}/strings.xml{suffix}")
         else:
             print(f"⚠️  Failed or got invalid XML for {folder}. Skipping.")
 
