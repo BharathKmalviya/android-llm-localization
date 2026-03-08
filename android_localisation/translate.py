@@ -6,9 +6,11 @@ import urllib.error
 import json
 
 DEFAULT_RES_DIR = "app/src/main/res"
+API_TIMEOUT = 60  # seconds
+
 
 def get_target_directories(res_dir):
-    """Finds all values-* directories inside the provided res/ directory"""
+    """Finds all values-* directories inside the provided res/ directory."""
     dirs = []
     if not os.path.exists(res_dir):
         return dirs
@@ -17,9 +19,11 @@ def get_target_directories(res_dir):
             dirs.append(d)
     return sorted(dirs)
 
+
 def read_source_xml(source_path):
     with open(source_path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def build_prompt(source_xml, target_folder_name, app_context):
     context_str = f"an Android app ({app_context})" if app_context else "an Android application"
@@ -41,6 +45,7 @@ SOURCE XML:
 {source_xml}
 """
 
+
 def clean_xml_response(result):
     if not result:
         return ""
@@ -53,59 +58,83 @@ def clean_xml_response(result):
         result = result[:-3]
     return result.strip()
 
+
+def _read_error_body(e):
+    try:
+        return e.read().decode("utf-8", errors="replace")[:500]
+    except Exception:
+        return "(could not read error body)"
+
+
 def call_gemini(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
             result = json.loads(response.read().decode("utf-8"))
-            return result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            candidates = result.get("candidates", [])
+            if not candidates:
+                print("  ❌ Gemini returned no candidates.")
+                return None
+            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
     except urllib.error.HTTPError as e:
-        print(f"  ❌ Gemini API Error: {e.code} - {e.read().decode('utf-8')}")
+        print(f"  ❌ Gemini API Error: {e.code} - {_read_error_body(e)}")
         return None
+
 
 def call_openai_compatible(api_key, base_url, model, prompt):
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
+        "Authorization": f"Bearer {api_key or ''}",
     }
     data = {
         "model": model,
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(base_url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
             result = json.loads(response.read().decode("utf-8"))
-            return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            choices = result.get("choices", [])
+            if not choices:
+                print("  ❌ OpenAI returned no choices.")
+                return None
+            return choices[0].get("message", {}).get("content", "")
     except urllib.error.HTTPError as e:
-        print(f"  ❌ OpenAI (compatible) API Error: {e.code} - {e.read().decode('utf-8')}")
+        print(f"  ❌ OpenAI (compatible) API Error: {e.code} - {_read_error_body(e)}")
         return None
+
 
 def call_anthropic(api_key, model, prompt):
     url = "https://api.anthropic.com/v1/messages"
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
-        "anthropic-version": "2023-06-01"
+        "anthropic-version": "2023-06-01",
     }
     data = {
         "model": model,
         "max_tokens": 4096,
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
             result = json.loads(response.read().decode("utf-8"))
-            return result.get("content", [{}])[0].get("text", "")
+            content = result.get("content", [])
+            if not content:
+                print("  ❌ Anthropic returned no content.")
+                return None
+            return content[0].get("text", "")
     except urllib.error.HTTPError as e:
-        print(f"  ❌ Anthropic API Error: {e.code} - {e.read().decode('utf-8')}")
+        print(f"  ❌ Anthropic API Error: {e.code} - {_read_error_body(e)}")
         return None
 
+
 def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context, base_url=None):
+    """Calls the selected provider API to translate the XML into the target language."""
     prompt = build_prompt(source_xml, target_folder_name, app_context)
     if provider == "gemini":
         result = call_gemini(api_key, model, prompt)
@@ -119,32 +148,40 @@ def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_
         return None
     return clean_xml_response(result)
 
-def main(args=None):
+
+def _parse_args(args=None):
     parser = argparse.ArgumentParser(description="Translate Android strings.xml using LLMs.")
-    parser.add_argument("--res-dir", default=DEFAULT_RES_DIR, help="Path to the Android res/ directory (default: app/src/main/res)")
-    parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider to use (default: gemini)")
-    parser.add_argument("--model", help="Specific model to use (e.g. gemini-2.5-flash, gpt-4o, claude-3-5-sonnet-latest)")
-    parser.add_argument("--api-key", help="API Key (or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY env vars)")
-    parser.add_argument("--base-url", help="Custom base URL for OpenAI-compatible endpoints (required for 'custom' provider)")
-    parser.add_argument("--app-context", help="Short description of your app for better translation context")
-    parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between requests to avoid rate limits (default: 5.0)")
+    parser.add_argument("--res-dir", default=DEFAULT_RES_DIR)
+    parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini")
+    parser.add_argument("--model")
+    parser.add_argument("--api-key")
+    parser.add_argument("--base-url")
+    parser.add_argument("--app-context")
+    parser.add_argument("--sleep", type=float, default=5.0)
+    return parser.parse_args(args)
 
-    args = parser.parse_args(args)
 
+def main(args=None):
+    # Accept either a pre-parsed Namespace (from cli.py) or raw argv list
+    if args is None or isinstance(args, list):
+        args = _parse_args(args)
+
+    # Resolve model default
     model = args.model
     if not model:
-        if args.provider == "gemini": model = "gemini-2.5-flash"
-        elif args.provider == "openai": model = "gpt-4o-mini"
-        elif args.provider == "anthropic": model = "claude-3-5-sonnet-latest"
+        if args.provider == "gemini":       model = "gemini-2.5-flash"
+        elif args.provider == "openai":     model = "gpt-4o-mini"
+        elif args.provider == "anthropic":  model = "claude-3-5-sonnet-latest"
         elif args.provider == "custom":
             print("❌ ERROR: You must specify --model when using a custom provider.")
             return
 
+    # Resolve API key
     api_key = args.api_key
     if not api_key:
-        if args.provider == "gemini": api_key = os.environ.get("GEMINI_API_KEY")
-        elif args.provider in ("openai", "custom"): api_key = os.environ.get("OPENAI_API_KEY")
-        elif args.provider == "anthropic": api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if args.provider == "gemini":                   api_key = os.environ.get("GEMINI_API_KEY")
+        elif args.provider in ("openai", "custom"):     api_key = os.environ.get("OPENAI_API_KEY")
+        elif args.provider == "anthropic":              api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             api_key = os.environ.get("API_KEY")
 
@@ -179,9 +216,12 @@ def main(args=None):
         print(f"⏳ Translating for {folder}...")
 
         provider_name = "openai" if args.provider == "custom" else args.provider
-        translated_xml = translate_xml(provider_name, api_key, model, source_xml, folder, args.app_context, args.base_url)
+        translated_xml = translate_xml(
+            provider_name, api_key, model, source_xml,
+            folder, args.app_context, args.base_url
+        )
 
-        if translated_xml and "<resources>" in translated_xml:
+        if translated_xml and "<resources>" in translated_xml and "</resources>" in translated_xml:
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(translated_xml)
@@ -193,6 +233,7 @@ def main(args=None):
             time.sleep(args.sleep)
 
     print("\n🎉 Translation process completed!")
+
 
 if __name__ == "__main__":
     main()

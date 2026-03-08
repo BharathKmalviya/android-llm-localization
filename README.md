@@ -1,110 +1,129 @@
 # Android Localization AI Scripts
 
-A collection of zero-dependency Python scripts to translate, fix, and verify Android Android `strings.xml` resources using Large Language Models (LLMs) like Google Gemini, OpenAI (ChatGPT), Anthropic (Claude), and Local models (Ollama).
+A zero-dependency Python tool to translate, fix, and verify Android `strings.xml` resources using Large Language Models (LLMs) — Gemini, OpenAI, Anthropic (Claude), or any local model via Ollama.
 
 ## Why this exists?
 
-Localizing Android apps usually involves paying for services, exporting CSVs, or manually using Google Translate. We wanted a way to automatically translate `strings.xml` directly in the project directory using modern LLMs, which provide significantly better context-aware translations.
+Localizing Android apps usually involves paying for services, exporting CSVs, or manually using Google Translate. This tool translates `strings.xml` directly in your project using modern LLMs, giving significantly better context-aware translations.
 
-These scripts have **ZERO dependencies** (no `pip install` required!) and use Python's built-in networking libraries to keep your developer environment clean.
-
----
-
-## The Scripts
-
-Find three main tools in this repository:
-1. `translate_strings.py`: The main tool. Translates your English strings into all other requested languages.
-2. `verify_strings.py`: A safety checker. Validates that translated strings won't crash your app due to malformed format specifiers (e.g. `%1$s`).
-3. `fix_strings.py`: A formatter. Fixes common XML and escaping issues caused by LLM hallucinations (like unescaped apostrophes).
+**Zero dependencies** — no `pip install` of extra libraries required. Uses only Python's built-in networking.
 
 ---
 
-## 1. Translating Strings (`translate_strings.py`)
-
-This script reads your default `app/src/main/res/values/strings.xml` and translates it into all other `values-*` directories it finds in your project.
-
-### Prerequisites
-1. You must have Python 3 installed.
-2. Ensure you have the target language folders created (e.g., `values-es/`, `values-hi/`). The script will look for these folders to know which languages to translate to.
-3. Get an API Key. **[Google Gemini AI Studio](https://aistudio.google.com/) provides a very generous free tier.**
-
-### Usage
+## Installation
 
 ```bash
-# Basic usage with Gemini (Default)
-python translate_strings.py --api-key YOUR_GEMINI_API_KEY
+pip install android-localisation
 ```
 
-**Customizing the execution:**
+To update to the latest version:
 
 ```bash
-python translate_strings.py \
-    --api-key YOUR_API_KEY \
-    --provider openai \
-    --model gpt-4o-mini \
-    --app-context "a fitness tracking and workout logger app" \
-    --res-dir app/src/main/res
+pip install --upgrade android-localisation
 ```
 
-### Full Arguments
+---
+
+## Quick Start
+
+```bash
+# 1. Translate (Gemini free tier recommended)
+android-localise translate --api-key YOUR_GEMINI_API_KEY
+
+# 2. Fix any XML escaping issues introduced by the LLM
+android-localise fix
+
+# 3. Verify no format specifiers were corrupted (requires Java JDK)
+android-localise verify
+```
+
+---
+
+## The Three Commands
+
+### 1. `translate` — Translate strings into all locale directories
+
+Reads `app/src/main/res/values/strings.xml` (English) and writes translated `strings.xml` into every `values-*` directory it finds.
+
+**Prerequisites:**
+- Create empty `values-<lang>/` folders for each language you want (e.g. `values-hi/`, `values-es/`)
+- Get an API key — **[Google Gemini AI Studio](https://aistudio.google.com/) has a generous free tier**
+
+```bash
+# Basic — Gemini (default)
+android-localise translate --api-key YOUR_GEMINI_API_KEY
+
+# With app context for better translations
+android-localise translate --api-key YOUR_KEY --app-context "a fitness tracking app"
+
+# OpenAI
+android-localise translate --api-key YOUR_KEY --provider openai --model gpt-4o
+
+# Anthropic (Claude)
+android-localise translate --api-key YOUR_KEY --provider anthropic
+
+# Local model via Ollama
+android-localise translate --provider custom --base-url http://localhost:11434/v1/chat/completions --model llama3
+```
+
+**Full arguments:**
+
 | Argument | Description | Default |
 |---|---|---|
-| `--api-key` | Your API key or set via env vars (`GEMINI_API_KEY`, etc.) | *None* |
-| `--provider` | AI Provider to use: `gemini`, `openai`, `anthropic`, `custom` | `gemini` |
-| `--model` | specific model to use (e.g. `gemini-2.5-flash`, `gpt-4o`) | defaults to provider standard |
-| `--app-context` | Short description of your app to guide the LLM's translation context | *None* |
-| `--res-dir` | Path to the Android `res` directory | `app/src/main/res` |
+| `--api-key` | API key (or set `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` env vars) | *None* |
+| `--provider` | AI provider: `gemini`, `openai`, `anthropic`, `custom` | `gemini` |
+| `--model` | Model name (e.g. `gemini-2.5-flash`, `gpt-4o`, `claude-3-5-sonnet-latest`) | provider default |
+| `--app-context` | Short description of your app to improve translation quality | *None* |
+| `--res-dir` | Path to the Android `res/` directory | `app/src/main/res` |
 | `--base-url` | Base URL for custom OpenAI-compatible endpoints | *None* |
-| `--sleep` | Seconds to sleep between requests to avoid rate limits | `5.0` |
+| `--sleep` | Seconds between requests to avoid rate limits | `5.0` |
 
-### Using Local Models (Ollama, LM Studio)
-If you want to run this entirely locally and for free without API limits, you can connect it to any OpenAI-compatible local server.
+---
+
+### 2. `fix` — Fix XML escaping issues
+
+LLMs occasionally introduce malformed characters — curly apostrophes (`'`), unescaped quotes, or broken `%` symbols. This command cleans them all up.
 
 ```bash
-# Example running against a local Ollama server running Llama 3
-python translate_strings.py \
-    --provider custom \
-    --base-url http://localhost:11434/v1/chat/completions \
-    --model llama3
+android-localise fix
+# or with a custom res dir:
+android-localise fix --res-dir path/to/res
 ```
 
 ---
 
-## 2. Verifying Translations (`verify_strings.py`)
+### 3. `verify` — Catch format specifier crashes before they happen
 
-LLMs are great, but they can occasionally mess up Android string format specifiers. For example, replacing `%1$s` with `%s` or `%`, which will throw an `UnknownFormatConversionException` and **CRASH** your app.
+LLMs can corrupt Android format specifiers like `%1$s` or `%d`, which causes `UnknownFormatConversionException` crashes at runtime. This command compiles a Java verifier and dry-runs `String.format()` against every translated string.
 
-This script compiles a Java verifier that dry-runs `String.format()` against every translated string using the native Java rules.
-
-### Usage
 ```bash
-python verify_strings.py --res-dir app/src/main/res
+android-localise verify
 ```
-*Note: Requires `javac` to be in your system PATH. If it fails, run it from the embedded terminal inside Android Studio.*
 
----
-
-## 3. Fixing Common Issues (`fix_strings.py`)
-
-Sometimes LLMs insert literal unicode apostrophes (`\u2019`) or unescaped single quotes (`'`), which breaks Android's AAPT2 compiler. 
-
-Run this script to automatically clean up and properly escape all strings.xml files.
-
-### Usage
-```bash
-python fix_strings.py --res-dir app/src/main/res
-```
+*Requires `javac` in your system PATH. Run from Android Studio's terminal if needed.*
 
 ---
 
 ## Recommended Workflow
 
-1. Update your English `strings.xml`.
-2. Create empty `values-<lang>` folders for the languages you want to support.
-3. Run `python translate_strings.py --api-key YOUR_API_KEY`.
-4. Run `python fix_strings.py` to fix escaping issues.
-5. Run `python verify_strings.py` to ensure no format specifier crashes.
-6. Build and test your app!
+1. Update your English `strings.xml`
+2. Create empty `values-<lang>/` folders for the languages you want
+3. `android-localise translate --api-key YOUR_KEY`
+4. `android-localise fix`
+5. `android-localise verify`
+6. Build and test your app
 
 ---
+
+## Supported Providers
+
+| Provider | Default Model | API Key Env Var |
+|---|---|---|
+| `gemini` (default) | `gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-3-5-sonnet-latest` | `ANTHROPIC_API_KEY` |
+| `custom` | *(must specify)* | `OPENAI_API_KEY` or none |
+
+---
+
 *Created to make Android localization accessible, free, and completely automated.*
