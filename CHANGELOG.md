@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.1] - 2026-03-08
+
+### Fixed
+- Fully automated release pipeline via GitHub Actions (no local build or manual tagging needed)
+- Auto-detect version bump on push to master, auto-tag, build, publish to PyPI, and create GitHub Release
+
+---
+
 ## [1.0.0] - 2026-03-08
 
 ### Added
