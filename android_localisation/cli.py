@@ -11,6 +11,7 @@ import sys
 import argparse
 from android_localisation import __version__
 
+
 def main():
     parser = argparse.ArgumentParser(
         prog="android-localise",
@@ -42,29 +43,17 @@ def main():
     args = parser.parse_args()
 
     if args.command == "translate":
-        from android_localisation.translate import main as translate_main
-        # Pass remaining args through as a list
-        extra = []
-        if args.res_dir != "app/src/main/res": extra += ["--res-dir", args.res_dir]
-        if args.provider != "gemini": extra += ["--provider", args.provider]
-        if args.model: extra += ["--model", args.model]
-        if args.api_key: extra += ["--api-key", args.api_key]
-        if args.base_url: extra += ["--base-url", args.base_url]
-        if args.app_context: extra += ["--app-context", args.app_context]
-        if args.sleep != 5.0: extra += ["--sleep", str(args.sleep)]
-        translate_main(extra)
+        from android_localisation.translate import main as run
+        run(args)
 
     elif args.command == "fix":
-        from android_localisation.fix import main as fix_main
-        extra = []
-        if args.res_dir != "app/src/main/res": extra += ["--res-dir", args.res_dir]
-        fix_main(extra)
+        from android_localisation.fix import main as run
+        run(args)
 
     elif args.command == "verify":
-        from android_localisation.verify import main as verify_main
-        extra = []
-        if args.res_dir != "app/src/main/res": extra += ["--res-dir", args.res_dir]
-        verify_main(extra)
+        from android_localisation.verify import main as run
+        run(args)
+
 
 if __name__ == "__main__":
     main()
