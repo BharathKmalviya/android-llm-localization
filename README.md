@@ -1,18 +1,18 @@
-# android-llm-localization
+# android-llm-localization — AI-Powered Android Localization Tool
 
 [![PyPI version](https://img.shields.io/pypi/v/android-localisation.svg)](https://pypi.org/project/android-localisation/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://pypi.org/project/android-localisation/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid service, no CSV exports, no copy-paste.
+**Automate Android app localization using AI.** Translate your Android `strings.xml` into multiple languages with Gemini, OpenAI, Anthropic, or a local model via Ollama — directly from the command line. No paid translation service, no CSV exports, no copy-paste.
 
 ---
 
-## The problem
+## Why Android localization is hard
 
 Localizing an Android app the usual way means exporting strings, running them through Google Translate or some dashboard, cleaning up the output, and re-importing — for every language, every update. It's slow, error-prone, and the translations often feel robotic.
 
-This tool does it differently. It reads your `strings.xml`, sends it to an LLM with context about your app, and writes the translated files directly into your project. The model understands UI language, keeps format specifiers intact, and produces natural-sounding output rather than word-for-word translations.
+This tool does it differently. It reads your `strings.xml`, sends it to an LLM with context about your app, and writes the translated files directly into your `res/` directory. The model understands UI language, keeps format specifiers intact, and produces natural-sounding output rather than word-for-word translations. It is the fastest way to add multilingual support to an Android app without a paid localization platform.
 
 ---
 
@@ -22,7 +22,19 @@ This tool does it differently. It reads your `strings.xml`, sends it to an LLM w
 pip install android-localisation
 ```
 
-Requires Python 3.8+. No other dependencies.
+Requires Python 3.8+. No other dependencies. Works on macOS, Linux, and Windows.
+
+---
+
+## Key features
+
+- **Translates Android `strings.xml`** into any language directly in your `res/` directory
+- **Multiple AI providers** — Gemini (default, free tier available), OpenAI, Anthropic, or any local model via Ollama / LM Studio
+- **Auto-creates locale folders** — pass `--languages hi,es,fr` and all `values-*/strings.xml` files are generated for you
+- **Preserves format specifiers** — `%1$s`, `%d`, `%1$f` and other Android format strings are never modified
+- **Fixes common LLM escaping issues** — the `fix` command corrects apostrophes, quotes, and `%` signs that would break the Android build
+- **Verifies translations at compile time** — the `verify` command catches `UnknownFormatConversionException` before your users do
+- **Zero dependencies** — pure Python 3.8+, stdlib only
 
 ---
 
