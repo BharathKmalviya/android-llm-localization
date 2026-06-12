@@ -1,32 +1,34 @@
 import os
 import re
 import time
+import socket
 import argparse
 import urllib.request
 import urllib.error
 import json
 
 DEFAULT_RES_DIR = "app/src/main/res"
-API_TIMEOUT = 60  # seconds
+DEFAULT_API_TIMEOUT = 180  # seconds (3 minutes) — large strings.xml files can exceed 60s
+MAX_TIMEOUT_RETRIES = 2
 
 # Ordered list of models per provider.
 # First entry = default. Rest = automatic fallbacks (used only when user hasn't pinned a model).
 PROVIDER_MODELS = {
     "gemini": [
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite",
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
+        "gemini-2.5-flash-lite",
     ],
     "openai": [
+        "gpt-5.4-mini",
+        "gpt-5-mini",
         "gpt-4o-mini",
-        "gpt-4o",
-        "gpt-3.5-turbo",
     ],
     "anthropic": [
-        "claude-3-5-haiku-latest",
-        "claude-3-5-sonnet-latest",
-        "claude-3-opus-latest",
+        "claude-haiku-4-5",
+        "claude-sonnet-4-6",
+        "claude-opus-4-8",
     ],
     "custom": [],  # user must specify --model
 }
@@ -133,27 +135,52 @@ def _is_model_not_found(http_code, body):
     ])
 
 
-def call_gemini(api_key, model, prompt):
+def _urlopen_with_retries(req, provider_label, timeout):
+    """
+    Execute an HTTP request with timeout/network error handling and retries on timeout.
+    Returns (response_bytes, model_not_found).
+    """
+    for attempt in range(MAX_TIMEOUT_RETRIES + 1):
+        if attempt > 0:
+            wait = attempt * 3
+            print(f"  🔁 {provider_label} timed out — retrying ({attempt}/{MAX_TIMEOUT_RETRIES}) in {wait}s...")
+            time.sleep(wait)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return response.read(), False
+        except urllib.error.HTTPError as e:
+            body = _read_error_body(e)
+            model_gone = _is_model_not_found(e.code, body)
+            print(f"  ❌ {provider_label} API Error: {e.code} - {body}")
+            return None, model_gone
+        except (TimeoutError, socket.timeout):
+            if attempt < MAX_TIMEOUT_RETRIES:
+                continue
+            print(f"  ❌ {provider_label} API timed out after {timeout}s ({MAX_TIMEOUT_RETRIES + 1} attempts)")
+            return None, False
+        except urllib.error.URLError as e:
+            print(f"  ❌ {provider_label} network error: {e.reason}")
+            return None, False
+    return None, False
+
+
+def call_gemini(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            candidates = result.get("candidates", [])
-            if not candidates:
-                print("  ❌ Gemini returned no candidates.")
-                return None, False
-            return result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", ""), False
-    except urllib.error.HTTPError as e:
-        body = _read_error_body(e)
-        model_gone = _is_model_not_found(e.code, body)
-        print(f"  ❌ Gemini API Error: {e.code} - {body}")
+    raw, model_gone = _urlopen_with_retries(req, "Gemini", timeout)
+    if raw is None:
         return None, model_gone
+    result = json.loads(raw.decode("utf-8"))
+    candidates = result.get("candidates", [])
+    if not candidates:
+        print("  ❌ Gemini returned no candidates.")
+        return None, False
+    return result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", ""), False
 
 
-def call_openai_compatible(api_key, base_url, model, prompt):
+def call_openai_compatible(api_key, base_url, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key or ''}",
@@ -163,22 +190,18 @@ def call_openai_compatible(api_key, base_url, model, prompt):
         "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(base_url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            choices = result.get("choices", [])
-            if not choices:
-                print("  ❌ OpenAI returned no choices.")
-                return None, False
-            return choices[0].get("message", {}).get("content", ""), False
-    except urllib.error.HTTPError as e:
-        body = _read_error_body(e)
-        model_gone = _is_model_not_found(e.code, body)
-        print(f"  ❌ OpenAI (compatible) API Error: {e.code} - {body}")
+    raw, model_gone = _urlopen_with_retries(req, "OpenAI (compatible)", timeout)
+    if raw is None:
         return None, model_gone
+    result = json.loads(raw.decode("utf-8"))
+    choices = result.get("choices", [])
+    if not choices:
+        print("  ❌ OpenAI returned no choices.")
+        return None, False
+    return choices[0].get("message", {}).get("content", ""), False
 
 
-def call_anthropic(api_key, model, prompt):
+def call_anthropic(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     url = "https://api.anthropic.com/v1/messages"
     headers = {
         "Content-Type": "application/json",
@@ -191,37 +214,33 @@ def call_anthropic(api_key, model, prompt):
         "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            content = result.get("content", [])
-            if not content:
-                print("  ❌ Anthropic returned no content.")
-                return None, False
-            return content[0].get("text", ""), False
-    except urllib.error.HTTPError as e:
-        body = _read_error_body(e)
-        model_gone = _is_model_not_found(e.code, body)
-        print(f"  ❌ Anthropic API Error: {e.code} - {body}")
+    raw, model_gone = _urlopen_with_retries(req, "Anthropic", timeout)
+    if raw is None:
         return None, model_gone
+    result = json.loads(raw.decode("utf-8"))
+    content = result.get("content", [])
+    if not content:
+        print("  ❌ Anthropic returned no content.")
+        return None, False
+    return content[0].get("text", ""), False
 
 
-def _call_provider(provider, api_key, model, prompt, base_url=None):
+def _call_provider(provider, api_key, model, prompt, base_url=None, timeout=DEFAULT_API_TIMEOUT):
     """Dispatches to the right API. Returns (text, model_not_found)."""
     if provider == "gemini":
-        return call_gemini(api_key, model, prompt)
+        return call_gemini(api_key, model, prompt, timeout)
     elif provider == "openai":
         url = base_url if base_url else "https://api.openai.com/v1/chat/completions"
-        return call_openai_compatible(api_key, url, model, prompt)
+        return call_openai_compatible(api_key, url, model, prompt, timeout)
     elif provider == "anthropic":
-        return call_anthropic(api_key, model, prompt)
+        return call_anthropic(api_key, model, prompt, timeout)
     else:
         print(f"❌ Unknown provider: {provider}")
         return None, False
 
 
 def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context,
-                  base_url=None, fallback_models=None):
+                  base_url=None, fallback_models=None, timeout=DEFAULT_API_TIMEOUT):
     """
     Calls the selected provider API to translate the XML.
     If the model is not found and fallback_models are provided, retries with the next one.
@@ -233,7 +252,9 @@ def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_
     for attempt_model in models_to_try:
         if attempt_model != model:
             print(f"  ↩️  Falling back to model: {attempt_model}")
-        result, model_not_found = _call_provider(provider, api_key, attempt_model, prompt, base_url)
+        result, model_not_found = _call_provider(
+            provider, api_key, attempt_model, prompt, base_url, timeout
+        )
         if result is not None:
             return clean_xml_response(result), attempt_model
         if not model_not_found:
@@ -252,6 +273,8 @@ def _parse_args(args=None):
     parser.add_argument("--base-url")
     parser.add_argument("--app-context")
     parser.add_argument("--sleep", type=float, default=5.0)
+    parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
+                        help=f"Seconds to wait for each API response (default: {DEFAULT_API_TIMEOUT})")
     parser.add_argument("--languages", help="Comma-separated language codes to translate into, e.g. hi,es,fr,de. Creates folders automatically if they don't exist.")
     return parser.parse_args(args)
 
@@ -333,7 +356,7 @@ def main(args=None):
 
         translated_xml, used_model = translate_xml(
             actual_provider, api_key, model, source_xml,
-            folder, args.app_context, args.base_url, fallback_models
+            folder, args.app_context, args.base_url, fallback_models, args.timeout
         )
 
         if translated_xml and "<resources" in translated_xml and "</resources>" in translated_xml:

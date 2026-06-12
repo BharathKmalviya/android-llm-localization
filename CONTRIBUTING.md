@@ -24,6 +24,38 @@ Use the local `test/` fixture (gitignored) for manual runs — see [AGENTS.md](A
 
 ---
 
+## Cross-platform testing
+
+**Current status:** the maintainer manually tests on **Windows only**. macOS and Linux are untested from our side, though the CLI uses stdlib Python and should be portable.
+
+We need contributors and testers on other platforms. You do not need to write code to help.
+
+### What to test
+
+From the repo root after `pip install -e .`:
+
+```bash
+android-localise --version
+android-localise translate --help
+android-localise translate --api-key YOUR_KEY --res-dir test/res --app-context "a test app"
+android-localise fix --res-dir test/res
+android-localise verify --res-dir test/res
+```
+
+Note your OS, Python version, shell, and provider (`gemini`, `openai`, etc.).
+
+### How to report results
+
+| Outcome | Action |
+|---|---|
+| Everything works | Open an issue: e.g. `Verified on Ubuntu 24.04 / Python 3.12` with the checklist above |
+| Something fails | Open a [bug report](https://github.com/BharathKmalviya/android-llm-localization/issues/new?template=bug_report.md) with full traceback and environment details |
+| You can fix it | Fork, branch from `dev`, fix, and open a PR — mention the platform in the description |
+
+Platform-specific docs (PATH, `javac`, env vars) in README or CONTRIBUTING are also appreciated.
+
+---
+
 ## Branch workflow
 
 | Branch | Purpose |
@@ -119,6 +151,7 @@ Releases are automated — never publish to PyPI manually.
 
 ## Ideas for contributors
 
+- **Cross-platform testing** on macOS and Linux — report issues or document quirks (see [Cross-platform testing](#cross-platform-testing))
 - Smarter `values-*` folder detection (skip `night`, `sw600dp`, `v21`, etc.)
 - iOS `Localizable.strings` / `.xcstrings` support (see README roadmap)
 - Unit tests for `fix.py` and format-specifier edge cases
