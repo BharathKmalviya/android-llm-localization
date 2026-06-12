@@ -30,7 +30,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Local AI assistant tooling (not part of the project)
 .claude/
+.cursor/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 
 # Local testing only
 test/

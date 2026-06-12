@@ -20,7 +20,7 @@ android-localise --version
 android-localise --help
 ```
 
-Use the local `test/` fixture (gitignored) for manual runs — see [AGENTS.md](AGENTS.md) for examples. Never commit the `test/` folder.
+Use the local `test/` fixture (gitignored) for manual runs — see the [Testing](#what-to-test) section below. Never commit the `test/` folder.
 
 ---
 
@@ -84,7 +84,6 @@ git push origin dev
 | XML escaping fixes | `android_localisation/fix.py` |
 | Format verifier | `android_localisation/verify.py`, `android_localisation/java/VerifyStrings.java` |
 | User docs | `README.md` |
-| Agent / maintainer docs | `AGENTS.md` |
 | Release notes | `CHANGELOG.md` |
 
 ---
@@ -108,7 +107,7 @@ git push origin dev
 
 **Docs-only changes** (README, CONTRIBUTING, etc.): no version bump needed.
 
-**New CLI flags**: add to the flags table in `README.md` and the translate flags table in `AGENTS.md`.
+**New CLI flags**: add to the flags table in `README.md`.
 
 ---
 
