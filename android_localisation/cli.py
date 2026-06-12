@@ -31,10 +31,10 @@ def main():
     translate_parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
     translate_parser.add_argument("--app-context", help="Short description of your app for better translations")
     translate_parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
-    from android_localisation.translate import DEFAULT_API_TIMEOUT
+    from android_localisation.translate import DEFAULT_API_TIMEOUT, MAX_TIMEOUT_RETRIES
     translate_parser.add_argument(
         "--timeout", type=float, default=DEFAULT_API_TIMEOUT,
-        help=f"Seconds to wait for each API response, up to 3 attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
+        help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
     )
     translate_parser.add_argument("--languages", help="Comma-separated language codes, e.g. hi,es,fr,de — creates folders and strings.xml automatically")
 

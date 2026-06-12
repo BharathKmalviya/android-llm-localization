@@ -7,7 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.0.6] - Unreleased
+## [1.0.7] - Unreleased
+
+### Fixed
+- **`cli.py` `--timeout` help drift**: attempt count now derives from `MAX_TIMEOUT_RETRIES` instead of a hard-coded "3 attempts"
+- **`clean_xml_response()` single-quoted `xmlns`**: xmlns stripping now handles both `"` and `'` attribute values
+
+---
+
+## [1.0.6] - 2026-06-12
 
 ### Fixed
 - **Timeout retries missed via `URLError`**: `urllib.request.urlopen()` often wraps `socket.timeout` in `urllib.error.URLError` — those are now retried like direct `TimeoutError`
