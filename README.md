@@ -268,9 +268,9 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 
 ## Platform support
 
-This project is developed and **manually tested on Windows only** at the moment. It is written in pure Python (stdlib only) and should run on macOS and Linux, but those platforms have **not been verified** by the maintainer yet.
+I develop and **manually test this project on Windows only** at the moment. It is written in pure Python (stdlib only) and should run on macOS and Linux, but I have **not verified** those platforms yet.
 
-We especially need help testing on:
+I especially need help testing on:
 
 - **macOS** — `translate`, `fix`, `verify` (including `javac` / Android Studio terminal)
 - **Linux** — same workflow, plus common CI environments
@@ -281,7 +281,7 @@ If you use another OS, please try the [quick start](#quick-start) workflow and r
 - **Broken?** — open a [bug report](https://github.com/BharathKmalviya/android-llm-localization/issues/new?template=bug_report.md) with the full error output
 - **Want to help more?** — see [Contributing](#contributing) and [CONTRIBUTING.md](CONTRIBUTING.md)
 
-Cross-platform fixes and test notes in pull requests are very welcome.
+PRs with cross-platform fixes and test notes are especially appreciated.
 
 ---
 
@@ -289,7 +289,7 @@ Cross-platform fixes and test notes in pull requests are very welcome.
 
 | Topic | Detail |
 |---|---|
-| **Platform testing** | Maintainer-tested on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
+| **Platform testing** | I test on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
 | **Scope** | Translates `values/strings.xml` only — not `plurals.xml`, `arrays.xml`, or other resource files |
 | **Overwrite** | Each run replaces the entire `strings.xml` in each locale folder with a fresh LLM translation |
 | **Folder scan** | Without `--languages`, every `values-*` folder is treated as a locale. Qualifier-only folders like `values-night` or `values-sw600dp` may be picked up incorrectly — prefer `--languages` or keep only locale folders in `res/` |
@@ -317,17 +317,17 @@ Cross-platform fixes and test notes in pull requests are very welcome.
 - [ ] **iOS support** — translate `Localizable.strings` and `Localizable.xcstrings` for iOS/macOS apps. The LLM prompt and provider logic is already in place — it mainly needs a parser for Apple's strings format and the right folder structure (`<lang>.lproj/`). Good first contribution if you're familiar with iOS projects.
 - [ ] **Smarter locale folder detection** — skip non-locale `values-*` qualifiers (`night`, `sw600dp`, `v21`, etc.) when scanning without `--languages`
 - [ ] **Automated test suite** — unit tests for `fix`, XML parsing, and format-specifier edge cases
-- [ ] **Cross-platform verification** — confirm `translate`, `fix`, and `verify` on macOS and Linux (Windows is maintainer-tested today)
+- [ ] **Cross-platform verification** — confirm `translate`, `fix`, and `verify` on macOS and Linux (I currently test on Windows only)
 
 ---
 
 ## Contributing
 
-Bug reports, pull requests, and **cross-platform testing** are all welcome. For larger changes, open an issue first.
+I welcome bug reports, pull requests, and **cross-platform testing**. For larger changes, please open an issue first.
 
 **No code required** — if you are on macOS or Linux, running the tool and filing an issue (pass or fail) is a real contribution. See [Platform support](#platform-support).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow, branch strategy, and release process.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, branch strategy, and release process.
 
 ```bash
 git clone https://github.com/BharathKmalviya/android-llm-localization

@@ -26,9 +26,9 @@ Use the local `test/` fixture (gitignored) for manual runs — see the [Testing]
 
 ## Cross-platform testing
 
-**Current status:** the maintainer manually tests on **Windows only**. macOS and Linux are untested from our side, though the CLI uses stdlib Python and should be portable.
+**Current status:** I manually test on **Windows only**. I have not verified macOS or Linux yet, though the CLI uses stdlib Python and should be portable.
 
-We need contributors and testers on other platforms. You do not need to write code to help.
+I need contributors and testers on other platforms. You do not need to write code to help.
 
 ### What to test
 
@@ -156,4 +156,4 @@ Releases are automated — never publish to PyPI manually.
 - Unit tests for `fix.py` and format-specifier edge cases
 - Better handling of `plurals.xml` and string arrays
 
-Open an issue before starting large features so we can align on approach.
+Open an issue before starting large features so I can align on approach.
