@@ -113,7 +113,7 @@ def clean_xml_response(result):
 
     # Strip xmlns namespace declarations from <resources> (leave other attributes intact)
     def _strip_xmlns(m):
-        attrs = re.sub(r'\s+xmlns(?::\w+)?\s*=\s*"[^"]*"', "", m.group(2))
+        attrs = re.sub(r"""\s+xmlns(?::\w+)?\s*=\s*(['"]).*?\1""", "", m.group(2))
         return m.group(1) + attrs + m.group(3)
 
     result = re.sub(r"(<resources)([^>]*)(>)", _strip_xmlns, result, count=1)
