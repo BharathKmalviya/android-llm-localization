@@ -36,6 +36,8 @@ android-localisation-scripts/
 │       └── values-*/              # Empty locale folders for testing
 ├── pyproject.toml                 # Package metadata, keywords, build config
 ├── CHANGELOG.md                   # Version history — updated on every release
+├── CONTRIBUTING.md                # Contributor guide (branch workflow, PR checklist)
+├── SECURITY.md                    # Vulnerability reporting policy
 ├── MANIFEST.in                    # Ensures java/ ships in source distributions
 ├── LICENSE                        # MIT
 └── README.md                      # User-facing documentation — always kept in sync
@@ -90,6 +92,14 @@ android-localise --version                            # show installed version
 | `--base-url` | Endpoint URL for custom/local providers | — |
 | `--sleep` | Seconds between API requests | `5.0` |
 
+**Other subcommand flags:**
+
+| Command | Flag | Default |
+|---|---|---|
+| `fix` | `--res-dir` | `app/src/main/res` |
+| `verify` | `--res-dir` | `app/src/main/res` |
+| `models` | `--provider` | all providers |
+
 ---
 
 ## Providers and models
@@ -102,6 +112,7 @@ android-localise --version                            # show installed version
 | `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
 | `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
 | `custom` | must set `--model` | none | `OPENAI_API_KEY` or none |
+| any | — | — | `API_KEY` (fallback if provider-specific var unset) |
 
 To add a provider: add it to `PROVIDER_MODELS`, add it to `choices` in `_parse_args()` in `translate.py`, and add it to the subparser in `cli.py`.
 
@@ -130,9 +141,11 @@ These apply automatically on every task. The user should never have to ask for a
 - Confirm the new version appears on PyPI
 
 **General:**
+- Always work on the `dev` branch — never commit directly to `master`
+- Never push unless the user explicitly says to push
 - Never leave the repo in a state where README, CHANGELOG, and code are out of sync
-- Never leave uncommitted changes after completing a task — always commit and push
-- If something breaks, fix it and push in the same session — don't leave broken state
+- Always commit changes locally after completing a task — push only when asked
+- If something breaks, fix it in the same session before stopping
 
 ---
 
@@ -219,6 +232,49 @@ GitHub Actions will detect the version bump, auto-tag the commit, build the pack
 
 ---
 
+## Branching workflow
+
+This repo uses a `dev` → `master` workflow. **Never push directly to `master`.**
+
+| Branch | Purpose |
+|---|---|
+| `dev` | All day-to-day changes — features, fixes, docs, refactors |
+| `master` | Production only — merged into via PR when ready to release |
+
+**Day-to-day (all changes go to `dev`):**
+```bash
+git checkout dev
+# make changes
+git add .
+git commit -m "your message"
+# DO NOT push unless the user says to
+```
+
+**When the user says to push:**
+```bash
+git push origin dev
+```
+
+**When the user says to release:**
+1. Bump version in `pyproject.toml` and `__init__.py`
+2. Update `CHANGELOG.md`
+3. Commit on `dev` and push
+4. Create a PR from `dev` → `master`:
+   ```bash
+   gh pr create --base master --head dev --title "Release vX.X.X" --body "See CHANGELOG.md"
+   ```
+5. Tell the user the PR URL — they review and merge
+6. After merge, GitHub Actions auto-publishes to PyPI
+
+**After a release merge, sync `dev` with `master`:**
+```bash
+git checkout dev
+git merge master
+git push origin dev
+```
+
+---
+
 ## PR / commit instructions
 
 - Commit message format: `<verb> <what> — <why if not obvious>`
@@ -227,6 +283,7 @@ GitHub Actions will detect the version bump, auto-tag the commit, build the pack
 - For releases: `Release vX.X.X — one-line summary of what changed`
 - Always run a local test before pushing a release commit
 - Keep commits focused — one logical change per commit
+- **Do not push after every small change** — batch related changes and push when the user asks
 
 ---
 
