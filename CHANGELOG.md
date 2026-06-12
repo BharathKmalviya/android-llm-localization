@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.5] - 2026-06-12
+
+### Fixed
+- **API timeout crash** ([#3](https://github.com/BharathKmalviya/android-llm-localization/issues/3)): `TimeoutError` and network errors no longer crash the CLI — they are caught, reported, and the locale is skipped
+- Large `strings.xml` files timing out at 60s — default API timeout increased to 180s (3 minutes) with automatic retries (up to 3 attempts) on timeout
+
+### Added
+- `--timeout` flag on `translate` to configure per-request API timeout in seconds (default: 180)
+
+### Changed
+- Default models updated to latest fast tiers: `gemini-3.5-flash`, `gpt-5.4-mini`, `claude-haiku-4-5` (with newer fallbacks per provider)
+
+---
+
 ## [1.0.4] - 2026-03-09
 
 ### Fixed
