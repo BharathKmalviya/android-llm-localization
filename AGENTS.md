@@ -91,6 +91,7 @@ android-localise --version                            # show installed version
 | `--res-dir` | Path to `res/` directory | `app/src/main/res` |
 | `--base-url` | Endpoint URL for custom/local providers | — |
 | `--sleep` | Seconds between API requests | `5.0` |
+| `--timeout` | Seconds to wait for each API response (retries on timeout) | `180` |
 
 **Other subcommand flags:**
 
@@ -108,9 +109,9 @@ android-localise --version                            # show installed version
 
 | Provider | Default | Fallbacks | Env var |
 |---|---|---|---|
-| `gemini` | `gemini-2.5-flash` | `gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-pro` | `GEMINI_API_KEY` |
-| `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
+| `gemini` | `gemini-3.5-flash` | `gemini-3.1-flash-lite` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` | `GEMINI_API_KEY` |
+| `openai` | `gpt-5.4-mini` | `gpt-5-mini` → `gpt-4o-mini` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-4-6` → `claude-opus-4-8` | `ANTHROPIC_API_KEY` |
 | `custom` | must set `--model` | none | `OPENAI_API_KEY` or none |
 | any | — | — | `API_KEY` (fallback if provider-specific var unset) |
 
