@@ -67,7 +67,7 @@ def main(args=None):
         def fix_match(m):
             opening_tag = m.group(1)
             # Skip strings marked formatted="false" — their % signs are literal, not specifiers
-            if 'formatted="false"' in opening_tag.lower() or "formatted='false'" in opening_tag.lower():
+            if re.search(r"\bformatted\s*=\s*['\"]false['\"]", opening_tag, flags=re.IGNORECASE):
                 return m.group(0)
             return opening_tag + _fix_text(m.group(2)) + m.group(3)
 

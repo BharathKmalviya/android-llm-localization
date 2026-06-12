@@ -79,7 +79,7 @@ Translate the English `strings.xml` below for {context_str} into the language fo
 For example, `values-hi` is Hindi, `values-es-rES` is Spanish (Spain), `values-zh-rTW` is Traditional Chinese, `values-ar` is Arabic, etc.
 
 STRICT GUIDELINES:
-1. Translate only the string values — never the keys, XML tags, or attributes.
+1. Translate only the string values — preserve keys, tags, and attributes (name, translatable, formatted) exactly as in the source.
 2. Use natural, human-sounding language. Simple everyday mobile UI tone. Not robotic or word-for-word.
 3. Preserve ALL placeholders exactly as-is: %s, %d, %1$s, %1$d, %2$s, etc.
 4. Preserve ALL escape sequences exactly as-is: \\n, \\', \\", \\\\.
@@ -89,7 +89,7 @@ STRICT GUIDELINES:
    - Start with: <?xml version="1.0" encoding="utf-8"?>
    - Use plain <resources> with NO namespace attributes (no xmlns:xliff or any other xmlns)
    - Every string on its own line: <string name="key">translated value</string>
-   - No CDATA, no extra attributes on <string> tags except name and translatable
+   - No CDATA, no extra attributes on <string> tags except name, translatable, and formatted
 8. Return ONLY the raw XML. No markdown, no code fences, no explanation.
 
 SOURCE XML:
@@ -111,8 +111,12 @@ def clean_xml_response(result):
         result = result[:-3]
     result = result.strip()
 
-    # Strip any xmlns namespace attributes from <resources> tag — not valid in standard Android strings.xml
-    result = re.sub(r'(<resources)\s+[^>]*?(>)', r'\1\2', result)
+    # Strip xmlns namespace declarations from <resources> (leave other attributes intact)
+    def _strip_xmlns(m):
+        attrs = re.sub(r'\s+xmlns(?::\w+)?\s*=\s*"[^"]*"', "", m.group(2))
+        return m.group(1) + attrs + m.group(3)
+
+    result = re.sub(r"(<resources)([^>]*)(>)", _strip_xmlns, result, count=1)
 
     return result
 
@@ -135,6 +139,15 @@ def _is_model_not_found(http_code, body):
     ])
 
 
+def _is_timeout_error(exc):
+    """True for direct timeouts and URLError wrappers (common from urllib.request.urlopen)."""
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return True
+    return isinstance(exc, urllib.error.URLError) and isinstance(
+        exc.reason, (TimeoutError, socket.timeout)
+    )
+
+
 def _urlopen_with_retries(req, provider_label, timeout):
     """
     Execute an HTTP request with timeout/network error handling and retries on timeout.
@@ -153,13 +166,13 @@ def _urlopen_with_retries(req, provider_label, timeout):
             model_gone = _is_model_not_found(e.code, body)
             print(f"  ❌ {provider_label} API Error: {e.code} - {body}")
             return None, model_gone
-        except (TimeoutError, socket.timeout):
+        except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
+            if not _is_timeout_error(e):
+                print(f"  ❌ {provider_label} network error: {e.reason}")
+                return None, False
             if attempt < MAX_TIMEOUT_RETRIES:
                 continue
             print(f"  ❌ {provider_label} API timed out after {timeout}s ({MAX_TIMEOUT_RETRIES + 1} attempts)")
-            return None, False
-        except urllib.error.URLError as e:
-            print(f"  ❌ {provider_label} network error: {e.reason}")
             return None, False
     return None, False
 
@@ -274,7 +287,7 @@ def _parse_args(args=None):
     parser.add_argument("--app-context")
     parser.add_argument("--sleep", type=float, default=5.0)
     parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
-                        help=f"Seconds to wait for each API response (default: {DEFAULT_API_TIMEOUT})")
+                        help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})")
     parser.add_argument("--languages", help="Comma-separated language codes to translate into, e.g. hi,es,fr,de. Creates folders automatically if they don't exist.")
     return parser.parse_args(args)
 
