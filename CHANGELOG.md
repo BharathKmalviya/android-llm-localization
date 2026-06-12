@@ -7,6 +7,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.6] - Unreleased
+
+### Fixed
+- **Timeout retries missed via `URLError`**: `urllib.request.urlopen()` often wraps `socket.timeout` in `urllib.error.URLError` — those are now retried like direct `TimeoutError`
+- **Translation prompt dropping `formatted="false"`**: prompt now preserves the `formatted` attribute so literal `%` strings are not corrupted by `fix`
+- **`clean_xml_response()` over-stripping `<resources>` attributes**: only `xmlns` declarations are removed now, not other attributes like `tools:ignore`
+- **`fix.py` missing `formatted = "false"` variants**: detection now handles whitespace around `=` (consistent with the Java verifier)
+
+### Changed
+- README/CLI `--timeout` docs clarified: up to 3 attempts on timeout (2 retries)
+
+---
+
 ## [1.0.5] - 2026-06-12
 
 ### Fixed

@@ -124,7 +124,7 @@ android-localise translate \
 | `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
 | `--base-url` | API endpoint for local/custom providers | — |
 | `--sleep` | Seconds to wait between language requests | `5.0` |
-| `--timeout` | Seconds to wait for each API response (retries up to 3 times on timeout) | `180` |
+| `--timeout` | Seconds to wait for each API response (up to 3 attempts on timeout) | `180` |
 
 ---
 

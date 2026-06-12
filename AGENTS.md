@@ -91,7 +91,7 @@ android-localise --version                            # show installed version
 | `--res-dir` | Path to `res/` directory | `app/src/main/res` |
 | `--base-url` | Endpoint URL for custom/local providers | — |
 | `--sleep` | Seconds between API requests | `5.0` |
-| `--timeout` | Seconds to wait for each API response (retries on timeout) | `180` |
+| `--timeout` | Seconds to wait for each API response (up to 3 attempts on timeout) | `180` |
 
 **Other subcommand flags:**
 
