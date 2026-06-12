@@ -1,10 +1,12 @@
-# android-llm-localization
+# android-localisation
 
 [![PyPI version](https://img.shields.io/pypi/v/android-localisation.svg)](https://pypi.org/project/android-localisation/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://pypi.org/project/android-localisation/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid service, no CSV exports, no copy-paste.
+**PyPI:** [`android-localisation`](https://pypi.org/project/android-localisation/) · **CLI:** `android-localise` · **Repo:** [android-llm-localization](https://github.com/BharathKmalviya/android-llm-localization)
+
+Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid translation service, no CSV exports, no copy-paste.
 
 ---
 
@@ -129,9 +131,12 @@ android-localise translate \
 
 ```bash
 android-localise fix
+android-localise fix --res-dir path/to/res
 ```
 
 LLMs occasionally produce output that looks correct but breaks the Android build — curly apostrophes (`'`) instead of escaped ones (`\'`), unescaped double quotes, or mangled `%` signs. This command scans every translated `strings.xml` and corrects these silently.
+
+Strings marked `formatted="false"` are skipped — their `%` signs are literal, not format specifiers.
 
 Always run this before `verify` and before building.
 
@@ -141,11 +146,12 @@ Always run this before `verify` and before building.
 
 ```bash
 android-localise verify
+android-localise verify --res-dir path/to/res
 ```
 
 Takes every translated string that contains a format specifier (`%1$s`, `%d`, `%1$f`, etc.) and calls `String.format()` on it using Java's actual runtime. If a translated string would throw `UnknownFormatConversionException` or `MissingFormatArgumentException` in your app, this catches it before your users do.
 
-Requires `javac` in your PATH. If you don't have it system-wide, run this from the Terminal tab inside Android Studio — it ships with a JDK.
+Strings marked `formatted="false"` are skipped. Requires `javac` in your PATH. If you don't have it system-wide, run this from the Terminal tab inside Android Studio — it ships with a JDK.
 
 ---
 
@@ -169,7 +175,7 @@ By default the tool uses Gemini with `gemini-2.5-flash`. You can switch provider
 | `gemini` _(default)_ | `gemini-2.5-flash` | `gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-pro` | `GEMINI_API_KEY` |
 | `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
 | `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
-| `custom` | set with `--model` | none | — |
+| `custom` | set with `--model` | none | `OPENAI_API_KEY` (optional) |
 
 If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
 
@@ -211,6 +217,9 @@ export GEMINI_API_KEY=your_key
 
 # Windows PowerShell
 $env:GEMINI_API_KEY = "your_key"
+
+# Windows CMD
+set GEMINI_API_KEY=your_key
 ```
 
 Then just run:
@@ -223,19 +232,25 @@ android-localise translate
 | `GEMINI_API_KEY` | `--provider gemini` |
 | `OPENAI_API_KEY` | `--provider openai` and `--provider custom` |
 | `ANTHROPIC_API_KEY` | `--provider anthropic` |
+| `API_KEY` | fallback for any provider if the provider-specific var is not set |
 
 ---
 
 ## Full workflow example
 
 ```bash
-# First time setup — create locale folders
+# First time setup — create locale folders (macOS / Linux)
 mkdir -p app/src/main/res/values-hi
 mkdir -p app/src/main/res/values-es
 mkdir -p app/src/main/res/values-de
 
+# Windows PowerShell
+New-Item -ItemType Directory -Force app/src/main/res/values-hi
+New-Item -ItemType Directory -Force app/src/main/res/values-es
+New-Item -ItemType Directory -Force app/src/main/res/values-de
+
 # Set your key once
-export GEMINI_API_KEY=your_key
+export GEMINI_API_KEY=your_key   # or $env:GEMINI_API_KEY on Windows
 
 # Translate, fix, verify
 android-localise translate --app-context "a habit tracking app"
@@ -250,9 +265,37 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 
 ---
 
+## Limitations
+
+| Topic | Detail |
+|---|---|
+| **Scope** | Translates `values/strings.xml` only — not `plurals.xml`, `arrays.xml`, or other resource files |
+| **Overwrite** | Each run replaces the entire `strings.xml` in each locale folder with a fresh LLM translation |
+| **Folder scan** | Without `--languages`, every `values-*` folder is treated as a locale. Qualifier-only folders like `values-night` or `values-sw600dp` may be picked up incorrectly — prefer `--languages` or keep only locale folders in `res/` |
+| **Network** | `translate` requires internet access to reach the LLM API (except local `custom` providers) |
+| **JDK** | `verify` requires `javac` on your PATH |
+
+---
+
+## Troubleshooting
+
+| Problem | What to try |
+|---|---|
+| `Could not find English strings.xml` | Check `--res-dir` points to your `res/` folder and `values/strings.xml` exists |
+| `No locale directories found` | Add `--languages hi,es,fr` or create `values-<lang>/` folders manually |
+| API auth errors | Confirm your key env var or `--api-key` matches the `--provider` |
+| `javac` not found | Install a JDK or run `verify` from Android Studio's terminal |
+| Build fails on apostrophes | Run `android-localise fix` before building |
+| `%` crashes at runtime | Run `android-localise verify` — it catches bad format specifiers before release |
+| Wrong folder translated | Use `--languages` to target exact locale codes instead of folder scan |
+
+---
+
 ## Roadmap
 
 - [ ] **iOS support** — translate `Localizable.strings` and `Localizable.xcstrings` for iOS/macOS apps. The LLM prompt and provider logic is already in place — it mainly needs a parser for Apple's strings format and the right folder structure (`<lang>.lproj/`). Good first contribution if you're familiar with iOS projects.
+- [ ] **Smarter locale folder detection** — skip non-locale `values-*` qualifiers (`night`, `sw600dp`, `v21`, etc.) when scanning without `--languages`
+- [ ] **Automated test suite** — unit tests for `fix`, XML parsing, and format-specifier edge cases
 
 ---
 
@@ -260,13 +303,22 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 
 Bug reports and pull requests are welcome. For larger changes, open an issue first.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow, branch strategy, and release process.
+
 ```bash
 git clone https://github.com/BharathKmalviya/android-llm-localization
 cd android-llm-localization
+git checkout dev
 pip install -e .
 ```
 
-Releases are automated via GitHub Actions — bump the version in `pyproject.toml` and `__init__.py`, update `CHANGELOG.md`, and push to `master`.
+Day-to-day work happens on the `dev` branch. Releases are merged to `master` via pull request, which triggers automated PyPI publishing.
+
+---
+
+## Security
+
+To report a security vulnerability, see [SECURITY.md](SECURITY.md). Please do not open public issues for security-sensitive reports.
 
 ---
 
