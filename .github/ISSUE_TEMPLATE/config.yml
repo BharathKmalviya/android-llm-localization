@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/BharathKmalviya/android-llm-localization/blob/master/SECURITY.md
+    about: Report security issues privately — do not use public issues

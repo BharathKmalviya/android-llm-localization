@@ -63,4 +63,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - 60-second timeout on all API calls
 - Zero external dependencies — uses Python stdlib only
 
+[1.0.4]: https://github.com/BharathKmalviya/android-llm-localization/releases/tag/v1.0.4
+[1.0.3]: https://github.com/BharathKmalviya/android-llm-localization/releases/tag/v1.0.3
+[1.0.2]: https://github.com/BharathKmalviya/android-llm-localization/releases/tag/v1.0.2
+[1.0.1]: https://github.com/BharathKmalviya/android-llm-localization/releases/tag/v1.0.1
 [1.0.0]: https://github.com/BharathKmalviya/android-llm-localization/releases/tag/v1.0.0

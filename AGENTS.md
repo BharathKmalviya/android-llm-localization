@@ -36,6 +36,8 @@ android-localisation-scripts/
 │       └── values-*/              # Empty locale folders for testing
 ├── pyproject.toml                 # Package metadata, keywords, build config
 ├── CHANGELOG.md                   # Version history — updated on every release
+├── CONTRIBUTING.md                # Contributor guide (branch workflow, PR checklist)
+├── SECURITY.md                    # Vulnerability reporting policy
 ├── MANIFEST.in                    # Ensures java/ ships in source distributions
 ├── LICENSE                        # MIT
 └── README.md                      # User-facing documentation — always kept in sync
@@ -90,6 +92,14 @@ android-localise --version                            # show installed version
 | `--base-url` | Endpoint URL for custom/local providers | — |
 | `--sleep` | Seconds between API requests | `5.0` |
 
+**Other subcommand flags:**
+
+| Command | Flag | Default |
+|---|---|---|
+| `fix` | `--res-dir` | `app/src/main/res` |
+| `verify` | `--res-dir` | `app/src/main/res` |
+| `models` | `--provider` | all providers |
+
 ---
 
 ## Providers and models
@@ -102,6 +112,7 @@ android-localise --version                            # show installed version
 | `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
 | `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
 | `custom` | must set `--model` | none | `OPENAI_API_KEY` or none |
+| any | — | — | `API_KEY` (fallback if provider-specific var unset) |
 
 To add a provider: add it to `PROVIDER_MODELS`, add it to `choices` in `_parse_args()` in `translate.py`, and add it to the subparser in `cli.py`.
 
