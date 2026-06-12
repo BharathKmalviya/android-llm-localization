@@ -60,7 +60,7 @@ When you run `android-localise translate --api-key YOUR_KEY`, here's exactly wha
 | What | Default |
 |---|---|
 | Provider | Gemini |
-| Model | `gemini-2.5-flash` |
+| Model | `gemini-3.5-flash` |
 | Source directory | `app/src/main/res` |
 | Delay between requests | 5 seconds |
 | App context | none (generic prompt) |
@@ -124,6 +124,7 @@ android-localise translate \
 | `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
 | `--base-url` | API endpoint for local/custom providers | — |
 | `--sleep` | Seconds to wait between language requests | `5.0` |
+| `--timeout` | Seconds to wait for each API response (retries up to 3 times on timeout) | `180` |
 
 ---
 
@@ -168,13 +169,13 @@ Lists every available model and fallback for each provider.
 
 ## Providers
 
-By default the tool uses Gemini with `gemini-2.5-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`.
+By default the tool uses Gemini with `gemini-3.5-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`.
 
 | Provider | Default model | Fallbacks | API key env var |
 |---|---|---|---|
-| `gemini` _(default)_ | `gemini-2.5-flash` | `gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-pro` | `GEMINI_API_KEY` |
-| `openai` | `gpt-4o-mini` | `gpt-4o` → `gpt-3.5-turbo` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-3-5-haiku-latest` | `claude-3-5-sonnet-latest` → `claude-3-opus-latest` | `ANTHROPIC_API_KEY` |
+| `gemini` _(default)_ | `gemini-3.5-flash` | `gemini-3.1-flash-lite` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` | `GEMINI_API_KEY` |
+| `openai` | `gpt-5.4-mini` | `gpt-5-mini` → `gpt-4o-mini` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-4-6` → `claude-opus-4-8` | `ANTHROPIC_API_KEY` |
 | `custom` | set with `--model` | none | `OPENAI_API_KEY` (optional) |
 
 If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
@@ -182,7 +183,7 @@ If the default model returns a "model not found" error (e.g. it was deprecated),
 **Using OpenAI:**
 ```bash
 android-localise translate --provider openai --api-key YOUR_KEY
-android-localise translate --provider openai --model gpt-4o --api-key YOUR_KEY
+android-localise translate --provider openai --model gpt-5.4-mini --api-key YOUR_KEY
 ```
 
 **Using Anthropic:**
@@ -265,10 +266,30 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 
 ---
 
+## Platform support
+
+This project is developed and **manually tested on Windows only** at the moment. It is written in pure Python (stdlib only) and should run on macOS and Linux, but those platforms have **not been verified** by the maintainer yet.
+
+We especially need help testing on:
+
+- **macOS** — `translate`, `fix`, `verify` (including `javac` / Android Studio terminal)
+- **Linux** — same workflow, plus common CI environments
+
+If you use another OS, please try the [quick start](#quick-start) workflow and report what you find:
+
+- **Works?** — open a [GitHub issue](https://github.com/BharathKmalviya/android-llm-localization/issues) titled e.g. `Confirmed working on macOS 14` with your OS, Python version, and provider used
+- **Broken?** — open a [bug report](https://github.com/BharathKmalviya/android-llm-localization/issues/new?template=bug_report.md) with the full error output
+- **Want to help more?** — see [Contributing](#contributing) and [CONTRIBUTING.md](CONTRIBUTING.md)
+
+Cross-platform fixes and test notes in pull requests are very welcome.
+
+---
+
 ## Limitations
 
 | Topic | Detail |
 |---|---|
+| **Platform testing** | Maintainer-tested on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
 | **Scope** | Translates `values/strings.xml` only — not `plurals.xml`, `arrays.xml`, or other resource files |
 | **Overwrite** | Each run replaces the entire `strings.xml` in each locale folder with a fresh LLM translation |
 | **Folder scan** | Without `--languages`, every `values-*` folder is treated as a locale. Qualifier-only folders like `values-night` or `values-sw600dp` may be picked up incorrectly — prefer `--languages` or keep only locale folders in `res/` |
@@ -296,12 +317,15 @@ After this, whenever you add or change strings in your English `strings.xml`, ru
 - [ ] **iOS support** — translate `Localizable.strings` and `Localizable.xcstrings` for iOS/macOS apps. The LLM prompt and provider logic is already in place — it mainly needs a parser for Apple's strings format and the right folder structure (`<lang>.lproj/`). Good first contribution if you're familiar with iOS projects.
 - [ ] **Smarter locale folder detection** — skip non-locale `values-*` qualifiers (`night`, `sw600dp`, `v21`, etc.) when scanning without `--languages`
 - [ ] **Automated test suite** — unit tests for `fix`, XML parsing, and format-specifier edge cases
+- [ ] **Cross-platform verification** — confirm `translate`, `fix`, and `verify` on macOS and Linux (Windows is maintainer-tested today)
 
 ---
 
 ## Contributing
 
-Bug reports and pull requests are welcome. For larger changes, open an issue first.
+Bug reports, pull requests, and **cross-platform testing** are all welcome. For larger changes, open an issue first.
+
+**No code required** — if you are on macOS or Linux, running the tool and filing an issue (pass or fail) is a real contribution. See [Platform support](#platform-support).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow, branch strategy, and release process.
 
