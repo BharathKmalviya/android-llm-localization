@@ -11,8 +11,8 @@ from android_localisation.resources import locale_folders, parse_resources, vali
 
 
 def _parse_args(args=None):
-    parser = argparse.ArgumentParser(description="Verify Android strings formatting.")
-    parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory")
+    parser = argparse.ArgumentParser(description="Check XML resource coverage, protected content and format arguments, then run Java formatting checks. Requires java and javac on PATH.")
+    parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
     return parser.parse_args(args)
 
 
