@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.2] - 2026-10-02
+
+### Added
+- Best-effort update notices for interactive CLI commands, using PyPI's stable release metadata and a 24-hour user cache. Notices show the upgrade command on stderr without waiting for the background lookup or installing updates.
+- `ANDROID_LOCALISE_NO_UPDATE_CHECK=1` disables checks. CI, pipes, redirected output and help/version requests skip them; network/cache failures do not affect command results.
+
+---
+
 ## [1.1.1] - 2026-10-02
 
 ### Changed

@@ -18,6 +18,9 @@ to refresh entire locale files; preservation and previews are opt-in.
   fallbacks, checked against official docs on 2026-10-02; preserve custom endpoints
   and explicit model selection. No older-generation automatic fallbacks.
 - [x] Synchronize user docs, version and local CLI guidance; verify and commit on dev.
+- [x] Add optional interactive release notices using a 24-hour user cache and a
+  nonblocking PyPI lookup; keep CI, pipes, help/version output and offline failures
+  silent, with an environment opt-out and no automatic installation.
 
 ## Follow-up scope
 
@@ -55,6 +58,10 @@ needed for these improvements.
 - The 1.1.1 catalog update passed CLI version/models/help smoke checks and 11
   mocked model-selection/version checks: exact latest-only lists, fallback order,
   pinned selections, failure handling and synchronized version metadata.
+- The 1.1.2 update notifier passed 22 local checks and the 33 CLI fixture checks.
+  Its wheel/source archive built, installed CLI/Java smoke checks passed, and an
+  installed-package notice example confirmed stderr instructions and unchanged
+  stdout. Live PyPI metadata lookup succeeded; release notices were simulated.
 - Provider replies were simulated. No paid translation requests, native-speaker
   accuracy assessment, Android builds or device-layout checks were performed.
 - Prepared and committed on `dev`; publication remains a separate requested step.
