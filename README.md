@@ -26,6 +26,8 @@ pip install android-localisation
 
 Requires Python 3.8+. No other dependencies.
 
+CLI output uses UTF-8, including when redirected to a file or pipe on Windows.
+
 ---
 
 ## Quick start
@@ -37,7 +39,7 @@ android-localise translate --api-key YOUR_GEMINI_KEY
 # Step 2 — fix any formatting issues the LLM may have introduced
 android-localise fix
 
-# Step 3 — verify nothing will crash at runtime
+# Step 3 — check resources and Java formatting
 android-localise verify
 ```
 
@@ -50,9 +52,9 @@ That's the full workflow. Run these three commands after every time you update y
 When you run `android-localise translate --api-key YOUR_KEY`, here's exactly what it does:
 
 1. Looks for `app/src/main/res/values/strings.xml` — this is your English source
-2. If `--languages` is provided, creates any missing `values-<lang>/` folders automatically. Otherwise scans the `res/` directory for existing `values-*` folders
-3. For each locale, if `strings.xml` doesn't exist it creates the file first, then sends your full English XML to the LLM with a prompt that instructs it to translate naturally, preserve all XML structure, and never touch format specifiers like `%1$s` or `%d`
-4. Writes the translated `strings.xml` directly into each locale folder
+2. If `--languages` is provided, selects those locales. Otherwise scans existing locale folders, skipping configuration-only folders such as `values-night`, `values-land`, `values-car`, and `values-sw600dp`
+3. Sends your English XML to the LLM with app context and instructions to preserve resource structure, protected values, namespaces and format specifiers. With `--missing-only`, requests only resources absent from the target file; existing resources remain untouched, and complete locales make no API request
+4. Parses the response and checks duplicate/unexpected/missing resources, attributes, inline markup, item structure, control escapes and format arguments. A valid result replaces the file atomically; new folders are created only when saving. `--dry-run` shows a diff without writing any files or creating folders
 5. Waits 5 seconds between each language request to avoid hitting API rate limits
 
 **Defaults used when you don't specify anything:**
@@ -60,12 +62,14 @@ When you run `android-localise translate --api-key YOUR_KEY`, here's exactly wha
 | What | Default |
 |---|---|
 | Provider | Gemini |
-| Model | `gemini-3.5-flash` |
+| Model | `gemini-3.8-flash` |
 | Source directory | `app/src/main/res` |
 | Delay between requests | 5 seconds |
 | App context | none (generic prompt) |
 
-Nothing is modified unless the translation comes back with valid XML. If a request fails, that language is skipped and logged — other languages continue.
+An invalid or incomplete response leaves the existing file unchanged. Other locales continue, and the final summary shows succeeded, failed and skipped counts. Exit code **0** means success; **1** means a setup, validation, API or save failure (including partial failure). Argument syntax errors use argparse's exit code **2**.
+
+Normal translation still replaces the whole locale file. Use `--missing-only` to retain reviewed translations or combine it with `--dry-run` to preview additions. No cache, database or configuration file is needed.
 
 ---
 
@@ -79,7 +83,7 @@ For target languages, you have two options:
 ```bash
 android-localise translate --api-key YOUR_KEY --languages hi,es,fr,de
 ```
-This creates `values-hi/`, `values-es/`, `values-fr/`, `values-de/` folders and their `strings.xml` files automatically, then translates into each one.
+This translates into Hindi, Spanish, French and German, creating each folder and `strings.xml` when its translation passes validation.
 
 **Option B — pre-create folders yourself:**
 ```
@@ -90,7 +94,7 @@ app/src/main/res/
 ├── values-es/
 └── values-fr/
 ```
-Run `android-localise translate --api-key YOUR_KEY` and it picks up any `values-*` folder it finds, creating `strings.xml` inside each one if it doesn't exist yet.
+Run `android-localise translate --api-key YOUR_KEY` and it picks up locale folders, creating `strings.xml` inside each one after successful translation. Locale examples include `values-hi`, `values-es-rES`, `values-b+zh+Hans`, and `values-en-night`; qualifier-only folders are skipped. `--languages` accepts the same forms without the optional `values-` prefix and rejects path separators or non-locale names.
 
 **Get a free API key:** [Google Gemini AI Studio](https://aistudio.google.com/) → Get API Key. The free tier handles most apps without hitting limits.
 
@@ -125,6 +129,19 @@ android-localise translate \
 | `--base-url` | API endpoint for local/custom providers | — |
 | `--sleep` | Seconds to wait between language requests | `5.0` |
 | `--timeout` | Seconds to wait for each API response (up to 3 attempts on timeout) | `180` |
+| `--missing-only` | Translate absent resources; retain existing translations | off (refresh whole file) |
+| `--dry-run` | Generate and validate output, then print a diff without writing files | off |
+
+**Preserve reviewed translations:**
+
+```bash
+android-localise translate --languages hi,es --missing-only
+android-localise translate --languages hi --missing-only --dry-run
+```
+
+`--dry-run` still calls the selected provider and may incur API charges. It is a translation preview, not a no-network estimate. `--missing-only` keeps existing resources, comments and text, but validates them against the current source first. An invalid existing file is reported rather than silently repaired. It does not detect changed English text for an existing key; use the normal translation mode when you deliberately want to refresh those resources. Arrays and plurals count as whole resources: this mode does not fill individual missing items.
+
+Validation permits positional placeholder reordering such as `%s %d` becoming `%2$d %1$s`, while checking argument identities, conversions, formatting options and occurrence counts. Non-translatable resources may be omitted from locale files to use Android's default fallback, but must remain unchanged if included.
 
 ---
 
@@ -135,11 +152,13 @@ android-localise fix
 android-localise fix --res-dir path/to/res
 ```
 
-LLMs occasionally produce output that looks correct but breaks the Android build — curly apostrophes (`'`) instead of escaped ones (`\'`), unescaped double quotes, or mangled `%` signs. This command scans every translated `strings.xml` and corrects these silently.
+This command scans locale `strings.xml` files, converts curly apostrophes, escapes raw apostrophes, and doubles bare percent signs while retaining recognized format patterns. It checks XML before and after changes and saves atomically. Inline markup attributes and non-translatable values are left alone. It handles single- and double-quoted resource names.
 
 Strings marked `formatted="false"` are skipped — their `%` signs are literal, not format specifiers.
 
 Always run this before `verify` and before building.
+
+`fix` repairs `<string>` text only. It does not repair arbitrary malformed XML, double-quote handling, or array/plural items, and it does not prove a format pattern is valid. Review its changes and use `verify` and your Android build afterward.
 
 ---
 
@@ -150,9 +169,11 @@ android-localise verify
 android-localise verify --res-dir path/to/res
 ```
 
-Takes every translated string that contains a format specifier (`%1$s`, `%d`, `%1$f`, etc.) and calls `String.format()` on it using Java's actual runtime. If a translated string would throw `UnknownFormatConversionException` or `MissingFormatArgumentException` in your app, this catches it before your users do.
+First parses XML and compares localized resources with `values/strings.xml`, checking coverage, duplicates, protected content, attributes, inline markup and format-argument preservation. Then checks formatted strings and array/plural items with Java's actual `String.format()` runtime, including date/time and relative argument indexing. Both checks return nonzero on failure. Empty locale folders without a `strings.xml` are skipped.
 
 Strings marked `formatted="false"` are skipped. Requires `javac` in your PATH. If you don't have it system-wide, run this from the Terminal tab inside Android Studio — it ships with a JDK.
+
+`formatted="false"` skips formatting checks only; XML, resource coverage and attribute checks still apply. Java compilation uses a temporary directory, so installed package files are not modified. Verification is deliberately stricter than Android's missing-string fallback: missing translatable resources are reported. Passing these checks does not replace an Android build, native-speaker review or device layout checks.
 
 ---
 
@@ -163,27 +184,33 @@ android-localise models                  # all providers
 android-localise models --provider openai  # one provider
 ```
 
-Lists every available model and fallback for each provider.
+Lists this CLI's configured defaults and automatic fallbacks, not the provider's entire model catalog. Any supported model can still be selected with `--model`.
 
 ---
 
 ## Providers
 
-By default the tool uses Gemini with `gemini-3.5-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`.
+By default the tool uses Gemini with `gemini-3.8-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`. Defaults favor fast text models rather than automatically choosing the most expensive flagship.
 
 | Provider | Default model | Fallbacks | API key env var |
 |---|---|---|---|
-| `gemini` _(default)_ | `gemini-3.5-flash` | `gemini-3.1-flash-lite` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` | `GEMINI_API_KEY` |
-| `openai` | `gpt-5.4-mini` | `gpt-5-mini` → `gpt-4o-mini` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-4-6` → `claude-opus-4-8` | `ANTHROPIC_API_KEY` |
+| `gemini` _(default)_ | `gemini-3.8-flash` | `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` | `GEMINI_API_KEY` |
+| `openai` | `gpt-6-luna` | `gpt-5.6-luna` → `gpt-5.4-mini` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-5-5` → `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
 | `custom` | set with `--model` | none | `OPENAI_API_KEY` (optional) |
 
 If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
 
+Model IDs and compatibility checked against [Google's model catalog](https://ai.google.dev/gemini-api/docs/models), [OpenAI's model catalog](https://developers.openai.com/api/docs/models) and [Anthropic's model catalog](https://platform.claude.com/docs/en/models/overview) on **2026-10-02**. Haiku 4.5 remains Anthropic's current fastest tier. Anthropic fallbacks are higher-cost models; pin `--model` to avoid automatic tier changes. Google limits legacy Gemini 2.5 access for new users, so those models are no longer automatic fallbacks. Existing model names remain usable explicitly if your account supports them.
+
+OpenAI and local providers retain the Chat Completions request format. Provider replies indicating truncation or blocked/incomplete output are rejected. Anthropic allows up to 16,384 output tokens per request and text blocks are collected separately from thinking blocks. Large files can still exceed a model's limits; automatic batching is future work.
+
 **Using OpenAI:**
 ```bash
 android-localise translate --provider openai --api-key YOUR_KEY
-android-localise translate --provider openai --model gpt-5.4-mini --api-key YOUR_KEY
+android-localise translate --provider openai --model gpt-6-luna --api-key YOUR_KEY
+# Optional stronger tier; different cost/latency
+android-localise translate --provider openai --model gpt-6.1-sol --api-key YOUR_KEY
 ```
 
 **Using Anthropic:**
@@ -262,7 +289,7 @@ android-localise verify
 ./gradlew assembleDebug
 ```
 
-After this, whenever you add or change strings in your English `strings.xml`, run the same three commands again. Existing translated strings will be overwritten with fresh translations.
+After this, whenever you add or change strings in your English `strings.xml`, run the same three commands again. Existing translated strings are refreshed by default. For additions that should retain existing translations, run `translate --missing-only` instead; it does not detect changed source text for existing keys.
 
 ---
 
@@ -290,9 +317,12 @@ PRs with cross-platform fixes and test notes are especially appreciated.
 | Topic | Detail |
 |---|---|
 | **Platform testing** | I test on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
-| **Scope** | Translates `values/strings.xml` only — not `plurals.xml`, `arrays.xml`, or other resource files |
-| **Overwrite** | Each run replaces the entire `strings.xml` in each locale folder with a fresh LLM translation |
-| **Folder scan** | Without `--languages`, every `values-*` folder is treated as a locale. Qualifier-only folders like `values-night` or `values-sw600dp` may be picked up incorrectly — prefer `--languages` or keep only locale folders in `res/` |
+| **Scope** | Reads `values/strings.xml` only. Strings, arrays and plurals within that file are checked; separate XML files are not scanned |
+| **Plurals** | Preserves source quantities and item structure; does not generate target-language plural categories. Review plural completeness for each language |
+| **Overwrite** | Normal runs refresh whole files. `--missing-only` retains existing resources but does not detect source changes |
+| **Folder scan** | Recognizes language-first and Android `b+` locale forms, with optional trailing qualifiers. MCC/MNC-prefixed resource folders are not scanned |
+| **Validation** | Requires source attributes, inline element order and formatting options to match. DTD/entity declarations are unsupported; checks do not replace Android compilation or language review |
+| **Large files** | One request per locale; no automatic batching or resume cache. Incomplete output is rejected |
 | **Network** | `translate` requires internet access to reach the LLM API (except local `custom` providers) |
 | **JDK** | `verify` requires `javac` on your PATH |
 
@@ -305,6 +335,7 @@ PRs with cross-platform fixes and test notes are especially appreciated.
 | `Could not find English strings.xml` | Check `--res-dir` points to your `res/` folder and `values/strings.xml` exists |
 | `No locale directories found` | Add `--languages hi,es,fr` or create `values-<lang>/` folders manually |
 | API auth errors | Confirm your key env var or `--api-key` matches the `--provider` |
+| Resource validation fails | Read the named resource error; check source/target keys, attributes, placeholders and markup. Existing files are retained |
 | `javac` not found | Install a JDK or run `verify` from Android Studio's terminal |
 | Build fails on apostrophes | Run `android-localise fix` before building |
 | `%` crashes at runtime | Run `android-localise verify` — it catches bad format specifiers before release |

@@ -7,7 +7,32 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.0.7] - Unreleased
+## [1.1.0] - 2026-10-02
+
+### Added
+- Shared XML/resource validation before saving and during `verify`: malformed XML, duplicate/missing/unexpected resources, changed attributes/markup, protected content, control escapes and dropped/changed format arguments are reported.
+- Opt-in `--missing-only` preserves existing resource text and requests absent resources; complete locales skip API calls. No source-history cache or new default overwrite policy.
+- Opt-in `--dry-run` generates a validated diff without writing files or creating directories; normal API charges still apply.
+- Per-locale translation summary and nonzero exits for setup/API/validation/save failures, including partial failures.
+
+### Fixed
+- Validated locale detection skips configuration-only folders; explicit languages are checked before filesystem or API work.
+- Atomic translation/fix writes preserve existing files when output is rejected or replacement fails.
+- Namespace declarations are retained; protected values and inline markup/attributes cannot be silently changed by translation.
+- Java verifier parses UTF-8 XML rather than regex matching and checks string-array/plural items, date/time formats and relative argument indices. Compilation uses a temporary directory rather than writing into the installed package.
+- `fix` retains protected string values and inline markup attributes, supports single-quoted names, checks XML and reports failures.
+- Incomplete/truncated provider responses are rejected; Gemini text parts and Anthropic text blocks are handled without treating thinking content as translated XML.
+- Corrected README claims about automatic XML validity, fixer coverage and runtime safety.
+- UTF-8 console/pipe output avoids Windows legacy-encoding crashes on status symbols and localized text.
+
+### Changed
+- Stable text-model catalog refreshed from official provider documentation on 2026-10-02: Gemini defaults to `gemini-3.8-flash` (fallbacks `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`); OpenAI defaults to `gpt-6-luna` (fallbacks `gpt-5.6-luna`, `gpt-5.4-mini`). Anthropic retains fastest-tier `claude-haiku-4-5`, with current `claude-sonnet-5-5` and `claude-opus-5-5` fallbacks. Explicit model selection/custom endpoints remain supported.
+- Anthropic output allowance increased from 4,096 to 16,384 tokens; incomplete responses still fail safely.
+- Existing commands and whole-file translation defaults remain; new preservation/preview behavior is optional. Resource verification is stricter than Android's fallback for missing translations.
+
+---
+
+## [1.0.7] - Unreleased (included in 1.1.0)
 
 ### Fixed
 - **`cli.py` `--timeout` help drift**: attempt count now derives from `MAX_TIMEOUT_RETRIES` instead of a hard-coded "3 attempts"

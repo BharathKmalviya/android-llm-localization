@@ -6,6 +6,18 @@ import argparse
 import urllib.request
 import urllib.error
 import json
+import math
+import difflib
+import sys
+
+if __package__ in (None, ""):
+    # Retain direct script execution as well as installed and -m entry points.
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from android_localisation.resources import (
+    atomic_write, is_locale_folder, locale_folders, merge_missing,
+    missing_resources, parse_resources, validate_resources,
+)
 
 DEFAULT_RES_DIR = "app/src/main/res"
 DEFAULT_API_TIMEOUT = 180  # seconds (3 minutes) — large strings.xml files can exceed 60s
@@ -15,59 +27,55 @@ MAX_TIMEOUT_RETRIES = 2
 # First entry = default. Rest = automatic fallbacks (used only when user hasn't pinned a model).
 PROVIDER_MODELS = {
     "gemini": [
-        "gemini-3.5-flash",
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
     ],
     "openai": [
+        "gpt-6-luna",
+        "gpt-5.6-luna",
         "gpt-5.4-mini",
-        "gpt-5-mini",
-        "gpt-4o-mini",
     ],
     "anthropic": [
         "claude-haiku-4-5",
-        "claude-sonnet-4-6",
-        "claude-opus-4-8",
+        "claude-sonnet-5-5",
+        "claude-opus-5-5",
     ],
     "custom": [],  # user must specify --model
 }
 
 
 def get_target_directories(res_dir):
-    """Finds all values-* directories inside the provided res/ directory."""
-    dirs = []
-    if not os.path.exists(res_dir):
-        return dirs
-    for d in os.listdir(res_dir):
-        if d.startswith("values-") and os.path.isdir(os.path.join(res_dir, d)):
-            dirs.append(d)
-    return sorted(dirs)
+    """Find locale directories, excluding configuration-only folders."""
+    return locale_folders(res_dir)
 
 
-def ensure_locale_dirs(res_dir, languages):
+def ensure_locale_dirs(res_dir, languages, create=True):
     """
     Creates values-<lang> directories for each language code in the list.
     Returns the list of folder names created or already existing.
     """
     created = []
+    # Validate the entire list before creating any directories.
     for lang in languages:
         lang = lang.strip()
         if not lang:
             continue
         folder = f"values-{lang}" if not lang.startswith("values-") else lang
+        if not is_locale_folder(folder):
+            raise ValueError("invalid Android locale: {} (use hi, es-rES or b+zh+Hans)".format(lang))
+        if folder not in created:
+            created.append(folder)
+    for folder in created:
         folder_path = os.path.join(res_dir, folder)
-        if not os.path.exists(folder_path):
+        if create and not os.path.exists(folder_path):
             os.makedirs(folder_path, exist_ok=True)
             print(f"📁 Created {folder}/")
-            created.append(folder)
-        else:
-            created.append(folder)
     return created
 
 
 def read_source_xml(source_path):
-    with open(source_path, "r", encoding="utf-8") as f:
+    with open(source_path, "r", encoding="utf-8", newline="") as f:
         return f.read()
 
 
@@ -79,7 +87,8 @@ Translate the English `strings.xml` below for {context_str} into the language fo
 For example, `values-hi` is Hindi, `values-es-rES` is Spanish (Spain), `values-zh-rTW` is Traditional Chinese, `values-ar` is Arabic, etc.
 
 STRICT GUIDELINES:
-1. Translate only the string values — preserve keys, tags, and attributes (name, translatable, formatted) exactly as in the source.
+1. Translate only eligible string and item values — preserve resource names, tags, item order, attributes and namespace declarations exactly as in the source.
+   Never change values marked translatable="false", resource references, or non-text resources.
 2. Use natural, human-sounding language. Simple everyday mobile UI tone. Not robotic or word-for-word.
 3. Preserve ALL placeholders exactly as-is: %s, %d, %1$s, %1$d, %2$s, etc.
 4. Preserve ALL escape sequences exactly as-is: \\n, \\', \\", \\\\.
@@ -87,9 +96,9 @@ STRICT GUIDELINES:
 6. Apostrophes in translated text MUST be escaped as \\' — never use a raw ' or a curly apostrophe.
 7. The output MUST use standard Android strings.xml format:
    - Start with: <?xml version="1.0" encoding="utf-8"?>
-   - Use plain <resources> with NO namespace attributes (no xmlns:xliff or any other xmlns)
+   - Preserve the source <resources> attributes and all xmlns declarations
    - Every string on its own line: <string name="key">translated value</string>
-   - No CDATA, no extra attributes on <string> tags except name, translatable, and formatted
+   - Preserve inline markup, CDATA content, string arrays and plural quantities; do not invent or remove resources
 8. Return ONLY the raw XML. No markdown, no code fences, no explanation.
 
 SOURCE XML:
@@ -110,13 +119,6 @@ def clean_xml_response(result):
     if result.endswith("```"):
         result = result[:-3]
     result = result.strip()
-
-    # Strip xmlns namespace declarations from <resources> (leave other attributes intact)
-    def _strip_xmlns(m):
-        attrs = re.sub(r"""\s+xmlns(?::\w+)?\s*=\s*(['"]).*?\1""", "", m.group(2))
-        return m.group(1) + attrs + m.group(3)
-
-    result = re.sub(r"(<resources)([^>]*)(>)", _strip_xmlns, result, count=1)
 
     return result
 
@@ -190,7 +192,12 @@ def call_gemini(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     if not candidates:
         print("  ❌ Gemini returned no candidates.")
         return None, False
-    return result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", ""), False
+    candidate = candidates[0]
+    if candidate.get("finishReason") not in (None, "STOP"):
+        print("  ❌ Gemini response was incomplete or blocked: {}".format(candidate.get("finishReason")))
+        return None, False
+    return "".join(part.get("text", "") for part in candidate.get("content", {}).get("parts", [])
+                   if not part.get("thought")), False
 
 
 def call_openai_compatible(api_key, base_url, model, prompt, timeout=DEFAULT_API_TIMEOUT):
@@ -211,6 +218,9 @@ def call_openai_compatible(api_key, base_url, model, prompt, timeout=DEFAULT_API
     if not choices:
         print("  ❌ OpenAI returned no choices.")
         return None, False
+    if choices[0].get("finish_reason") not in (None, "stop"):
+        print("  ❌ OpenAI-compatible response was incomplete: {}".format(choices[0].get("finish_reason")))
+        return None, False
     return choices[0].get("message", {}).get("content", ""), False
 
 
@@ -223,7 +233,7 @@ def call_anthropic(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     }
     data = {
         "model": model,
-        "max_tokens": 4096,
+        "max_tokens": 16384,
         "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
@@ -235,7 +245,10 @@ def call_anthropic(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
     if not content:
         print("  ❌ Anthropic returned no content.")
         return None, False
-    return content[0].get("text", ""), False
+    if result.get("stop_reason") not in (None, "end_turn"):
+        print("  ❌ Anthropic response was incomplete: {}".format(result.get("stop_reason")))
+        return None, False
+    return "".join(block.get("text", "") for block in content if block.get("type") == "text"), False
 
 
 def _call_provider(provider, api_key, model, prompt, base_url=None, timeout=DEFAULT_API_TIMEOUT):
@@ -253,13 +266,17 @@ def _call_provider(provider, api_key, model, prompt, base_url=None, timeout=DEFA
 
 
 def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context,
-                  base_url=None, fallback_models=None, timeout=DEFAULT_API_TIMEOUT):
+                  base_url=None, fallback_models=None, timeout=DEFAULT_API_TIMEOUT, only_resources=None):
     """
     Calls the selected provider API to translate the XML.
     If the model is not found and fallback_models are provided, retries with the next one.
     Returns (translated_xml, model_used).
     """
     prompt = build_prompt(source_xml, target_folder_name, app_context)
+    if only_resources is not None:
+        prompt += "\nMISSING-ONLY UPDATE: The source above provides context. Return a <resources> document " \
+                  "containing ONLY these resource types and names, retaining their original attributes " \
+                  "and structure: {}. Do not return the other resources.\n".format(json.dumps(only_resources))
     models_to_try = [model] + (fallback_models or [])
 
     for attempt_model in models_to_try:
@@ -289,12 +306,23 @@ def _parse_args(args=None):
     parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
                         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})")
     parser.add_argument("--languages", help="Comma-separated language codes to translate into, e.g. hi,es,fr,de. Creates folders automatically if they don't exist.")
+    parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
+    parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
     return parser.parse_args(args)
 
 
 def main(args=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     if args is None or isinstance(args, list):
         args = _parse_args(args)
+
+    missing_only = getattr(args, "missing_only", False)
+    dry_run = getattr(args, "dry_run", False)
+    if not math.isfinite(args.sleep) or args.sleep < 0 or not math.isfinite(args.timeout) or args.timeout <= 0:
+        print("❌ ERROR: --sleep must be finite and nonnegative; --timeout must be finite and positive.")
+        return 1
 
     provider = args.provider
     user_pinned_model = bool(args.model)  # True if user explicitly chose a model
@@ -307,7 +335,7 @@ def main(args=None):
     else:
         if provider == "custom":
             print("❌ ERROR: You must specify --model when using a custom provider.")
-            return
+            return 1
         model_list = PROVIDER_MODELS.get(provider, [])
         model = model_list[0] if model_list else None
         fallback_models = model_list[1:]
@@ -323,11 +351,11 @@ def main(args=None):
 
     if not api_key and provider != "custom":
         print("❌ ERROR: Please provide an API key via --api-key or the appropriate environment variable.")
-        return
+        return 1
 
     if provider == "custom" and not args.base_url:
         print("❌ ERROR: You must provide --base-url when using a custom provider.")
-        return
+        return 1
 
     res_dir = args.res_dir
     source_strings_xml = os.path.join(res_dir, "values", "strings.xml")
@@ -335,22 +363,25 @@ def main(args=None):
     print(f"🔍 Reading source XML from: {source_strings_xml}")
     if not os.path.exists(source_strings_xml):
         print("❌ ERROR: Could not find English strings.xml at the specified path.")
-        return
+        return 1
 
-    source_xml = read_source_xml(source_strings_xml)
-
-    # Build target directory list — from --languages flag or by scanning res_dir
-    if args.languages:
-        lang_codes = [l.strip() for l in args.languages.split(",") if l.strip()]
-        target_dirs = ensure_locale_dirs(res_dir, lang_codes)
-    else:
-        target_dirs = get_target_directories(res_dir)
+    try:
+        source_xml = read_source_xml(source_strings_xml)
+        parse_resources(source_xml)
+        # Translation never needs to create folders before the response is valid.
+        if args.languages:
+            target_dirs = ensure_locale_dirs(res_dir, args.languages.split(","), create=False)
+        else:
+            target_dirs = get_target_directories(res_dir)
+    except (OSError, ValueError) as exc:
+        print("❌ ERROR: {}".format(exc))
+        return 1
 
     if not target_dirs:
         print(f"⚠️  No locale directories found in {res_dir}.")
         print("    Either create values-<lang>/ folders manually, or use --languages to specify them:")
         print("    Example: android-localise translate --languages hi,es,fr,de --api-key YOUR_KEY")
-        return
+        return 1
 
     print(f"🌍 Found {len(target_dirs)} language directories.")
     fallback_note = "" if user_pinned_model else f" (fallbacks: {', '.join(fallback_models)})" if fallback_models else ""
@@ -358,6 +389,7 @@ def main(args=None):
 
     actual_provider = "openai" if provider == "custom" else provider
 
+    succeeded = failed = skipped = 0
     for folder in target_dirs:
         target_path = os.path.join(res_dir, folder, "strings.xml")
         is_new_file = not os.path.exists(target_path)
@@ -367,33 +399,47 @@ def main(args=None):
         else:
             print(f"⏳ [{folder}] Updating existing strings.xml...")
 
-        translated_xml, used_model = translate_xml(
-            actual_provider, api_key, model, source_xml,
-            folder, args.app_context, args.base_url, fallback_models, args.timeout
-        )
-
-        if translated_xml and "<resources" in translated_xml and "</resources>" in translated_xml:
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(translated_xml)
-            suffix = f" (via {used_model})" if used_model != model else ""
-            action = "Created" if is_new_file else "Updated"
-            print(f"✅ {action} {folder}/strings.xml{suffix}")
-        else:
-            if translated_xml is None:
-                print(f"⚠️  [{folder}] API call failed — see error above. Skipping.")
-            elif "<resources" not in translated_xml:
-                preview = translated_xml[:200].replace("\n", " ") if translated_xml else "(empty response)"
-                print(f"⚠️  [{folder}] Response missing <resources> tag. Skipping.")
-                print(f"    Response preview: {preview}")
+        try:
+            existing_xml = read_source_xml(target_path) if not is_new_file else ""
+            if missing_only and not is_new_file and not existing_xml.strip():
+                raise ValueError("existing file is empty XML; use normal translation to regenerate it")
+            missing = missing_resources(source_xml, existing_xml) if missing_only else None
+            if missing_only and not missing:
+                print("⏭️  [{}] No missing resources. Skipping API request.".format(folder))
+                skipped += 1
+                continue
+            translated_xml, used_model = translate_xml(
+                actual_provider, api_key, model, source_xml,
+                folder, args.app_context, args.base_url, fallback_models, args.timeout,
+                only_resources=missing
+            )
+            if not translated_xml:
+                raise ValueError("API returned no usable translation")
+            if missing_only:
+                translated_xml = merge_missing(source_xml, existing_xml, translated_xml, missing)
             else:
-                print(f"⚠️  [{folder}] Response missing </resources> closing tag. Skipping.")
+                validate_resources(source_xml, translated_xml)
+            if dry_run:
+                diff = difflib.unified_diff(existing_xml.splitlines(True), translated_xml.splitlines(True),
+                                            fromfile=target_path, tofile=target_path + " (preview)")
+                print("".join(diff))
+            else:
+                atomic_write(target_path, translated_xml)
+            suffix = f" (via {used_model})" if used_model != model else ""
+            action = "Previewed" if dry_run else "Created" if is_new_file else "Updated"
+            print(f"✅ {action} {folder}/strings.xml{suffix}")
+            succeeded += 1
+        except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+            print("❌ [{}] {}. Existing file preserved.".format(folder, exc))
+            failed += 1
 
         if args.sleep > 0:
             time.sleep(args.sleep)
 
-    print("\n🎉 Translation process completed!")
+    print("\nTranslation summary: {} succeeded, {} failed, {} skipped{}.".format(
+        succeeded, failed, skipped, " (preview only)" if dry_run else ""))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

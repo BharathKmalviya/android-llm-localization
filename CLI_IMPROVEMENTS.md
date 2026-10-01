@@ -1,0 +1,76 @@
+# CLI improvement plan
+
+The CLI stays small, uses Python 3.8+ and the standard library, and keeps the
+existing `translate` -> `fix` -> `verify` workflow. Normal translation continues
+to refresh entire locale files; preservation and previews are opt-in.
+
+## Current implementation scope
+
+- [x] Validate XML, resource coverage, attributes, inline markup, protected
+  content and format arguments before saving.
+- [x] Save atomically so rejected responses and failed writes preserve files.
+- [x] Share resource validation with `verify`, retaining Java runtime checks.
+- [x] Detect locale folders correctly and reject invalid language paths.
+- [x] Add `--missing-only` and `--dry-run`, without a cache or configuration system.
+- [x] Report per-locale outcomes and nonzero exits for failures.
+- [x] Reject truncated provider responses and handle text response blocks.
+- [x] Refresh stable text-model defaults and fallbacks from official docs,
+  checked on 2026-10-02; preserve custom endpoints and explicit model selection.
+- [x] Synchronize user docs, version and local CLI guidance; verify and commit on dev.
+
+## Follow-up scope
+
+Glossaries and per-resource context, bounded batches/rate-limit backoff, source
+hashes for changed-resource detection, and translation across multiple XML files.
+Plural-category expansion requires a separate design: copying English categories
+does not provide complete localization for every target language. No IDE plugin,
+database, background service, third-party dependency or automatic publishing is
+needed for these improvements.
+
+## Compatibility and verification
+
+- Existing command names, provider flags, environment variables and local-model
+  endpoints remain supported. `--model` continues to disable fallback.
+- `--missing-only` retains existing resource content; it does not infer source
+  changes. `--dry-run` may call the provider but never creates folders/files.
+- Failure exits are an intentional correction for CI: 0 succeeds, 1 fails.
+- Verify with local CLI fixtures and simulated API replies, including invalid
+  XML, missing/extra keys, duplicate names, protected content, argument reordering,
+  namespaces, partial failures, missing-only preservation and read-only previews.
+- Live API access and natural language quality need a real-provider manual run;
+  structural checks do not prove translation quality or Android layout behavior.
+
+## Local verification results (2026-10-02)
+
+- 59 local checks passed using Python 3.14.7 and Java 21 on Windows. Fixtures
+  covered successful and rejected CLI output, missing-only preservation,
+  previews, provider text/truncation handling, fallbacks, fixer behavior,
+  atomic-write failures, old Namespace callers and resource validation.
+- Python modules parse with Python 3.8 grammar; execution on Python 3.8 and
+  macOS/Linux remains unverified.
+- The 1.1.0 wheel built and installed into an isolated local target. Its CLI
+  and Java verifier ran, Java source was bundled, and metadata has no runtime
+  dependencies. Local fixtures and tooling are excluded from the wheel.
+- Provider replies were simulated. No paid translation requests, native-speaker
+  accuracy assessment, Android builds or device-layout checks were performed.
+- Prepared and committed on `dev`; publication remains a separate requested step.
+
+## Manual real-provider check
+
+With your provider key set as documented in README, use a disposable resource
+copy that includes placeholders, inline markup, non-translatable strings and a
+partially translated locale:
+
+```bash
+android-localise translate --res-dir path/to/res --languages hi,es --dry-run
+android-localise translate --res-dir path/to/res --languages hi,es --missing-only
+android-localise fix --res-dir path/to/res
+android-localise verify --res-dir path/to/res
+```
+
+Check that the preview creates no files, approved text is retained, new resources
+are translated naturally, placeholders still match, and your Android build passes.
+Normal `translate` intentionally refreshes existing resources; test that mode on
+another disposable copy. Review language and layout in your application before
+using translations in production. Arrays/plurals in `strings.xml` are validated,
+but `fix` still repairs only strings and plural categories are not expanded.

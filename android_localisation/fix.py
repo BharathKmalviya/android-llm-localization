@@ -1,15 +1,15 @@
 import os
 import re
-import glob
 import argparse
+import sys
 
-# Matches any valid Java/Android format specifier:
-# e.g. %s, %d, %f, %1$s, %2$d, %1$f, %-10s, %+d, etc.
-_FORMAT_SPECIFIER = re.compile(
-    r'%(\d+\$)?([-#+ 0,(<]*)?(\d+)?(\.\d+)?([tT]?[a-zA-Z])'
-)
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Recognizes valid specifier suffixes so we don't double-escape them
+from android_localisation.resources import atomic_write, locale_folders, parse_resources
+
+# Retain format-looking patterns rather than guessing corrections.
+# The verifier checks actual conversions and argument compatibility.
 _VALID_SPECIFIER = re.compile(
     r'%(\d+\$)?([-#+ 0,(<]*)?(\d+)?(\.\d+)?([tT]?[a-zA-Z%])'
 )
@@ -52,37 +52,59 @@ def _parse_args(args=None):
 
 
 def main(args=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     if args is None or isinstance(args, list):
         args = _parse_args(args)
 
     res_dir = args.res_dir
     print(f"Fixing strings in: {res_dir}")
-    files = glob.glob(os.path.join(res_dir, "values-*", "strings.xml"))
+    if not os.path.isdir(res_dir):
+        print("ERROR: Resource directory does not exist: {}".format(res_dir))
+        return 1
+    files = [os.path.join(res_dir, folder, "strings.xml") for folder in locale_folders(res_dir)
+             if os.path.isfile(os.path.join(res_dir, folder, "strings.xml"))]
     fixed_count = 0
+    failed_count = 0
 
     for xml_file in files:
-        with open(xml_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            with open(xml_file, 'r', encoding='utf-8', newline='') as f:
+                content = f.read()
+            parse_resources(content)
+        except (OSError, ValueError) as exc:
+            print("ERROR: {}: {}".format(xml_file, exc))
+            failed_count += 1
+            continue
 
         def fix_match(m):
             opening_tag = m.group(1)
             # Skip strings marked formatted="false" — their % signs are literal, not specifiers
-            if re.search(r"\bformatted\s*=\s*['\"]false['\"]", opening_tag, flags=re.IGNORECASE):
+            if re.search(r"\b(?:formatted|translatable)\s*=\s*['\"]false['\"]", opening_tag, flags=re.IGNORECASE):
                 return m.group(0)
-            return opening_tag + _fix_text(m.group(2)) + m.group(3)
+            # Only fix text segments; attributes inside inline markup are protected.
+            parts = re.split(r"(<[^>]+>)", m.group(2))
+            value = "".join(part if part.startswith("<") else _fix_text(part) for part in parts)
+            return opening_tag + value + m.group(3)
 
         new_content = re.sub(
-            r'(<string[^>]*name="[^"]*"[^>]*>)(.*?)(</string>)',
+            r"(<string\b[^>]*\bname\s*=\s*['\"][^'\"]*['\"][^>]*>)(.*?)(</string>)",
             fix_match, content, flags=re.DOTALL
         )
 
         if content != new_content:
-            with open(xml_file, 'w', encoding='utf-8') as f:
-                f.write(new_content)
-            fixed_count += 1
+            try:
+                parse_resources(new_content)
+                atomic_write(xml_file, new_content)
+                fixed_count += 1
+            except (OSError, ValueError) as exc:
+                print("ERROR: {}: {}. Existing file preserved.".format(xml_file, exc))
+                failed_count += 1
 
     print(f"Done fixing strings. Fixed {fixed_count} files out of {len(files)}.")
+    return 1 if failed_count else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
