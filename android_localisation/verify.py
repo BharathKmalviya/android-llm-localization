@@ -2,6 +2,12 @@ import os
 import subprocess
 import sys
 import argparse
+import tempfile
+
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from android_localisation.resources import locale_folders, parse_resources, validate_resources
 
 
 def _parse_args(args=None):
@@ -11,46 +17,66 @@ def _parse_args(args=None):
 
 
 def main(args=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     if args is None or isinstance(args, list):
         args = _parse_args(args)
 
     package_dir = os.path.dirname(os.path.abspath(__file__))
     java_file = os.path.join(package_dir, "java", "VerifyStrings.java")
-    java_out_dir = os.path.join(package_dir, "java")
     project_root = os.getcwd()
+
+    try:
+        with open(os.path.join(args.res_dir, "values", "strings.xml"), encoding="utf-8") as handle:
+            source_xml = handle.read()
+        parse_resources(source_xml)
+        failures = 0
+        for folder in locale_folders(args.res_dir):
+            path = os.path.join(args.res_dir, folder, "strings.xml")
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    validate_resources(source_xml, handle.read())
+            except (OSError, ValueError) as exc:
+                print("[!] {}: {}".format(folder, exc))
+                failures += 1
+        if failures:
+            print("[!] Resource verification failed for {} locale(s).".format(failures))
+            return 1
+    except (OSError, ValueError) as exc:
+        print("[!] ERROR: {}".format(exc))
+        return 1
 
     if not os.path.exists(java_file):
         print(f"[!] ERROR: Java verifier not found at {java_file}")
         print("    This may indicate a broken installation. Try:")
         print("      pip install --force-reinstall android-localisation")
-        sys.exit(1)
+        return 1
 
-    # 1. Compile the Java verifier
-    print("Compiling VerifyStrings.java...")
-    try:
-        subprocess.run(["javac", "-d", java_out_dir, java_file], check=True)
-    except FileNotFoundError:
-        print("\n[!] ERROR: 'javac' command not found.")
-        print("    Please ensure you have a Java JDK installed and 'javac' is in your system PATH.")
-        print("    Alternatively, run this from the Terminal inside Android Studio.")
-        sys.exit(1)
-    except subprocess.CalledProcessError:
-        print("Failed to compile VerifyStrings.java")
-        sys.exit(1)
-
-    # 2. Run the Java verifier
-    print(f"Running String Verifier against {args.res_dir}...")
-    run_result = subprocess.run(
-        ["java", "-cp", java_out_dir, "VerifyStrings", args.res_dir],
-        cwd=project_root
-    )
+    # Compile outside the installed package (which may be read-only).
+    with tempfile.TemporaryDirectory(prefix="android-localise-") as java_out_dir:
+        print("Compiling VerifyStrings.java...")
+        try:
+            subprocess.run(["javac", "-encoding", "UTF-8", "-d", java_out_dir, java_file], check=True)
+            print(f"Running String Verifier against {args.res_dir}...")
+            run_result = subprocess.run(
+                ["java", "-cp", java_out_dir, "VerifyStrings", args.res_dir], cwd=project_root)
+        except FileNotFoundError:
+            print("[!] ERROR: 'javac' and 'java' must be in PATH. Use a JDK or Android Studio's terminal.")
+            return 1
+        except subprocess.CalledProcessError:
+            print("[!] Failed to compile VerifyStrings.java")
+            return 1
 
     if run_result.returncode != 0:
         print("\n[!] VERIFICATION FAILED: Found broken string formatting that could crash the app.")
-        sys.exit(run_result.returncode)
+        return run_result.returncode
     else:
-        print("\n[+] VERIFICATION PASSED: All localizations are syntactically safe.")
+        print("\n[+] VERIFICATION PASSED: Resource checks and Java formatting checks passed.")
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

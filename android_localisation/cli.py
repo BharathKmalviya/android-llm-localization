@@ -9,10 +9,14 @@ Usage:
 """
 
 import argparse
+import sys
 from android_localisation import __version__
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(
         prog="android-localise",
         description="Zero-dependency Android strings.xml localization using LLMs.",
@@ -37,6 +41,8 @@ def main():
         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
     )
     translate_parser.add_argument("--languages", help="Comma-separated language codes, e.g. hi,es,fr,de — creates folders and strings.xml automatically")
+    translate_parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
+    translate_parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
 
     # --- fix ---
     fix_parser = subparsers.add_parser("fix", help="Fix XML escaping issues in translated strings.xml files")
@@ -47,7 +53,7 @@ def main():
     verify_parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
 
     # --- models ---
-    models_parser = subparsers.add_parser("models", help="List all available models per provider")
+    models_parser = subparsers.add_parser("models", help="List configured model defaults and fallbacks")
     models_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic"], default=None,
                                help="Filter by provider (shows all if not set)")
 
@@ -55,15 +61,15 @@ def main():
 
     if args.command == "translate":
         from android_localisation.translate import main as run
-        run(args)
+        return run(args)
 
     elif args.command == "fix":
         from android_localisation.fix import main as run
-        run(args)
+        return run(args)
 
     elif args.command == "verify":
         from android_localisation.verify import main as run
-        run(args)
+        return run(args)
 
     elif args.command == "models":
         from android_localisation.translate import PROVIDER_MODELS
@@ -80,9 +86,9 @@ def main():
         print("    → Any model name your local server supports (must use --model)")
         print()
         print("  Tip: use --model to pick any model, e.g:")
-        print("    android-localise translate --provider openai --model gpt-5.4-mini --api-key KEY")
+        print("    android-localise translate --provider openai --model gpt-6-luna --api-key KEY")
         print()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -26,9 +26,9 @@ Use the local `test/` fixture (gitignored) for manual runs — see the [Testing]
 
 ## Cross-platform testing
 
-**Current status:** the maintainer manually tests on **Windows only**. macOS and Linux are untested from our side, though the CLI uses stdlib Python and should be portable.
+**Current status:** I manually test on **Windows only**. I have not verified macOS or Linux yet, though the CLI uses stdlib Python and should be portable.
 
-We need contributors and testers on other platforms. You do not need to write code to help.
+I need contributors and testers on other platforms. You do not need to write code to help.
 
 ### What to test
 
@@ -82,6 +82,7 @@ git push origin dev
 | New CLI flag | `android_localisation/cli.py` + relevant module `_parse_args()` |
 | Translation / LLM logic | `android_localisation/translate.py` |
 | XML escaping fixes | `android_localisation/fix.py` |
+| Shared XML validation / safe writes / locale detection | `android_localisation/resources.py` |
 | Format verifier | `android_localisation/verify.py`, `android_localisation/java/VerifyStrings.java` |
 | User docs | `README.md` |
 | Release notes | `CHANGELOG.md` |
@@ -151,9 +152,9 @@ Releases are automated — never publish to PyPI manually.
 ## Ideas for contributors
 
 - **Cross-platform testing** on macOS and Linux — report issues or document quirks (see [Cross-platform testing](#cross-platform-testing))
-- Smarter `values-*` folder detection (skip `night`, `sw600dp`, `v21`, etc.)
+- Glossaries and per-resource context (see [CLI improvement plan](CLI_IMPROVEMENTS.md))
 - iOS `Localizable.strings` / `.xcstrings` support (see README roadmap)
 - Unit tests for `fix.py` and format-specifier edge cases
-- Better handling of `plurals.xml` and string arrays
+- Multiple XML files, bounded batches and target-language plural categories
 
-Open an issue before starting large features so we can align on approach.
+Open an issue before starting large features so I can align on approach.

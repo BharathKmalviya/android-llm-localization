@@ -20,7 +20,7 @@ Include:
 - Potential impact
 - Suggested fix (if you have one)
 
-You should receive a response within 7 days. We will work with you to understand and address the issue before any public disclosure.
+You should receive a response within 7 days. I'll work with you to understand and address the issue before any public disclosure.
 
 ## Scope
 
