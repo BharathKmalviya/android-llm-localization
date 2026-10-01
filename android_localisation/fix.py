@@ -46,8 +46,8 @@ def _fix_text(text):
 
 
 def _parse_args(args=None):
-    parser = argparse.ArgumentParser(description="Fix common string formatting issues in Android strings.xml files.")
-    parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory")
+    parser = argparse.ArgumentParser(description="Repair apostrophe and percent escaping in locale string text; requires parseable XML. Skips formatted=false/translatable=false strings and does not repair arrays or plurals.")
+    parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
     return parser.parse_args(args)
 
 

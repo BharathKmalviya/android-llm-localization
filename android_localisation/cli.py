@@ -20,18 +20,49 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         prog="android-localise",
         description="Zero-dependency Android strings.xml localization using LLMs.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Typical workflow:
+  android-localise translate --languages hi,es --app-context "a notes app"
+  android-localise fix
+  android-localise verify
+
+Other examples:
+  android-localise translate --languages hi --missing-only --dry-run
+  android-localise models --provider openai
+  python -m android_localisation setup-path          (Windows, one-time)
+
+Use android-localise COMMAND --help for flags, defaults and examples.
+All commands also work with: python -m android_localisation COMMAND
+Keys: GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or API_KEY.
+Update notices: set ANDROID_LOCALISE_NO_UPDATE_CHECK=1 to disable them.""",
     )
     parser.add_argument("--version", action="version", version=f"android-localisation {__version__}")
 
-    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
+    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND", title="commands")
     subparsers.required = True
 
     # --- translate ---
-    translate_parser = subparsers.add_parser("translate", help="Translate strings.xml into all locale directories")
+    translate_parser = subparsers.add_parser(
+        "translate", help="Translate strings.xml into selected or existing locales",
+        description="""Translate values/strings.xml using the selected provider and app context.
+Output is validated before saving. Existing locale files are refreshed by
+default; --missing-only preserves existing resources and fills missing ones.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise translate --languages hi,es --app-context "a notes app"
+  android-localise translate --provider openai --res-dir path/to/res
+  android-localise translate --languages hi --missing-only --dry-run
+  android-localise translate --provider custom --model YOUR_LOCAL_MODEL --base-url http://localhost:11434/v1/chat/completions
+
+Source: RES_DIR/values/strings.xml. Existing locale folders are used when
+--languages is omitted. --dry-run may incur API charges.
+Exit codes: 0 success, 1 setup/API/validation/save failure, 2 invalid arguments.
+Use android-localise models to see current defaults and fallbacks.""",
+    )
     translate_parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
     translate_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
-    translate_parser.add_argument("--model", help="Any model name supported by the provider (uses provider default if not set)")
-    translate_parser.add_argument("--api-key", help="API key (or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY)")
+    translate_parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
+    translate_parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
     translate_parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
     translate_parser.add_argument("--app-context", help="Short description of your app for better translations")
     translate_parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
@@ -40,25 +71,77 @@ def main(args=None):
         "--timeout", type=float, default=DEFAULT_API_TIMEOUT,
         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
     )
-    translate_parser.add_argument("--languages", help="Comma-separated language codes, e.g. hi,es,fr,de — creates folders and strings.xml automatically")
+    translate_parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
     translate_parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     translate_parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
 
     # --- fix ---
-    fix_parser = subparsers.add_parser("fix", help="Fix XML escaping issues in translated strings.xml files")
+    fix_parser = subparsers.add_parser(
+        "fix", help="Repair apostrophe and percent escaping in locale strings",
+        description="""Repair escaping in locale <string> text and save validated XML atomically.
+Skips formatted=false and translatable=false strings. Does not repair
+malformed XML, double quotes, string-array items or plural items.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise fix
+  android-localise fix --res-dir path/to/res
+
+Run verify and your Android build afterward. Exit code 1 reports failures.""",
+    )
     fix_parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
 
     # --- verify ---
-    verify_parser = subparsers.add_parser("verify", help="Verify translated strings won't crash the app (requires javac)")
+    verify_parser = subparsers.add_parser(
+        "verify", help="Check XML resources and Java format arguments (requires JDK)",
+        description="""Compare localized strings.xml files with values/strings.xml, then run
+Java formatting checks for strings, arrays and plurals. Checks cover XML,
+resource coverage, protected content, attributes, markup and format arguments.
+Requires java and javac on PATH; does not replace an Android build or review.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise verify
+  android-localise verify --res-dir path/to/res
+
+Exit code 0 means checks passed; 1 reports resource, Java or setup failures.""",
+    )
     verify_parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
 
     # --- models ---
-    models_parser = subparsers.add_parser("models", help="List configured model defaults and fallbacks")
+    models_parser = subparsers.add_parser(
+        "models", help="List configured model defaults and fallbacks",
+        description="""List this CLI release's provider defaults and automatic fallback models.
+Use translate --model to pin a model, including models not in this list.
+Custom/local providers require an explicit --model.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise models
+  android-localise models --provider openai""",
+    )
     models_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic"], default=None,
                                help="Filter by provider (shows all if not set)")
 
+    subparsers.add_parser(
+        "setup-path", help="Add the installed Scripts folder to Windows user PATH",
+        description="""One-time Windows setup for an installed CLI that PowerShell cannot find.
+Adds the installed Scripts folder to user PATH without administrator access,
+preserving entries and avoiding duplicates. Virtual environments use activation.
+Ordinary commands and pip installation do not change PATH.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Run with the same Python that installed the package:
+  python -m android_localisation setup-path
+
+Close and reopen your terminal application afterward. Until then, use:
+  python -m android_localisation --help
+
+Exit code 1 reports unsupported platforms, virtual environments or setup failures.""",
+    )
+
     if args is None or isinstance(args, list):
-        args = parser.parse_args(args)
+        argv = sys.argv[1:] if args is None else args
+        if not argv:
+            parser.print_help()
+            return 0
+        args = parser.parse_args(argv)
 
     from android_localisation.updates import start_update_check, show_update_notice
     update_state = start_update_check()
@@ -69,7 +152,11 @@ def main(args=None):
 
 
 def _run_command(args):
-    if args.command == "translate":
+    if args.command == "setup-path":
+        from android_localisation.setup_path import main as run
+        return run(args)
+
+    elif args.command == "translate":
         from android_localisation.translate import main as run
         return run(args)
 

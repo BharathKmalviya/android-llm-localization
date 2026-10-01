@@ -28,6 +28,30 @@ Requires Python 3.8+. No other dependencies.
 
 CLI output uses UTF-8, including when redirected to a file or pipe on Windows.
 
+### Windows PATH setup
+
+If PowerShell cannot find `android-localise`, run this once using the same Python
+that installed the package:
+
+```powershell
+python -m android_localisation setup-path
+```
+
+This detects the installed Scripts folder and adds it to your **user PATH**,
+preserving existing entries and avoiding duplicates. No administrator access is
+required. Close and reopen your terminal application afterward. Normal wheel
+installation with `pip` does not run this setup automatically, and existing
+PowerShell sessions cannot have their environment changed by the child Python
+process. Virtual environments should be activated instead; their Scripts folders
+are not persisted in user PATH.
+
+The CLI also works immediately through Python on any platform:
+
+```powershell
+python -m android_localisation --help
+python -m android_localisation translate --api-key YOUR_KEY
+```
+
 ### Update notices
 
 Interactive `android-localise` commands check PyPI for a newer stable release in
@@ -120,6 +144,20 @@ Run `android-localise translate --api-key YOUR_KEY` and it picks up locale folde
 
 ## Commands
 
+Run `android-localise` or `android-localise --help` to see every command and the
+typical workflow. Each command has detailed help with its options and examples:
+
+```bash
+android-localise translate --help
+android-localise fix --help
+android-localise verify --help
+android-localise models --help
+python -m android_localisation setup-path --help
+```
+
+Use `android-localise --version` to check the installed version. Help/version
+requests do not call providers, check for updates or modify files/PATH.
+
 ### `translate`
 
 ```bash
@@ -203,6 +241,18 @@ android-localise models --provider openai  # one provider
 ```
 
 Lists this CLI's configured defaults and automatic fallbacks, not the provider's entire model catalog. Any supported model can still be selected with `--model`.
+
+---
+
+### `setup-path` (Windows)
+
+```powershell
+python -m android_localisation setup-path
+```
+
+Adds the installed Scripts directory to Windows user PATH. See
+[Windows PATH setup](#windows-path-setup) for terminal restart and virtual
+environment behavior. All commands can also run through `python -m android_localisation`.
 
 ---
 

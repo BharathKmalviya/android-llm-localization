@@ -294,17 +294,20 @@ def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_
 
 
 def _parse_args(args=None):
-    parser = argparse.ArgumentParser(description="Translate Android strings.xml using LLMs.")
-    parser.add_argument("--res-dir", default=DEFAULT_RES_DIR)
-    parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini")
-    parser.add_argument("--model", help="Any model name for the chosen provider. Uses provider default if not set.")
-    parser.add_argument("--api-key")
-    parser.add_argument("--base-url")
-    parser.add_argument("--app-context")
-    parser.add_argument("--sleep", type=float, default=5.0)
+    parser = argparse.ArgumentParser(
+        description="Translate values/strings.xml using LLMs; validate output before saving. Existing locale files are refreshed unless --missing-only is set.",
+        epilog="Use python -m android_localisation translate --help for workflow examples, or python -m android_localisation models for model defaults.",
+    )
+    parser.add_argument("--res-dir", default=DEFAULT_RES_DIR, help="Path to the Android res/ directory (default: app/src/main/res)")
+    parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
+    parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
+    parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
+    parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
+    parser.add_argument("--app-context", help="Short description of your app for better translations")
+    parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
     parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
                         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})")
-    parser.add_argument("--languages", help="Comma-separated language codes to translate into, e.g. hi,es,fr,de. Creates folders automatically if they don't exist.")
+    parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
     parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
     return parser.parse_args(args)

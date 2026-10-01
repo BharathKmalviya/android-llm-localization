@@ -7,6 +7,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.3] - 2026-10-02
+
+### Added
+- `setup-path` detects this Python's installed Windows Scripts folder and adds it to user PATH without administrator access, preserving existing entries and registry type and avoiding duplicates. Virtual environments are left to normal activation.
+- `python -m android_localisation` runs the full CLI when the console script is not yet on PATH, including the one-time setup command. Installation itself and ordinary commands do not modify PATH.
+
+### Changed
+- Root help now lists all five commands with workflow examples, Python launcher instructions and key/update environment variables. Each command's help explains its scope, defaults, examples and relevant failure behavior; verification no longer claims to guarantee app runtime safety.
+- Running the unified CLI without arguments prints help and exits successfully without network requests or PATH changes. Direct translation-module flag descriptions are synchronized with the unified CLI.
+
+---
+
 ## [1.1.2] - 2026-10-02
 
 ### Added

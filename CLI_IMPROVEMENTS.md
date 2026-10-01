@@ -21,6 +21,10 @@ to refresh entire locale files; preservation and previews are opt-in.
 - [x] Add optional interactive release notices using a 24-hour user cache and a
   nonblocking PyPI lookup; keep CI, pipes, help/version output and offline failures
   silent, with an environment opt-out and no automatic installation.
+- [x] Add explicit Windows user PATH setup and a Python module launcher; keep
+  pip installation and ordinary commands free of PATH changes.
+- [x] Expand root and per-command help with every command, defaults, behavior,
+  examples and Python launcher instructions; show help when no command is given.
 
 ## Follow-up scope
 
@@ -62,6 +66,11 @@ needed for these improvements.
   Its wheel/source archive built, installed CLI/Java smoke checks passed, and an
   installed-package notice example confirmed stderr instructions and unchanged
   stdout. Live PyPI metadata lookup succeeded; release notices were simulated.
+- The 1.1.3 Windows setup/module launcher passed 26 checks, the 22 update-notice
+  checks and the 33 CLI fixture checks. Registry writes were mocked; actual
+  Windows setup confirmed the already configured Scripts directory without
+  writing it again. Eight help/version smoke checks covered all five commands
+  and bare invocation, with no update lookup or PATH writes.
 - Provider replies were simulated. No paid translation requests, native-speaker
   accuracy assessment, Android builds or device-layout checks were performed.
 - Prepared and committed on `dev`; publication remains a separate requested step.
