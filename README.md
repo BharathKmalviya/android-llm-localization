@@ -190,18 +190,18 @@ Lists this CLI's configured defaults and automatic fallbacks, not the provider's
 
 ## Providers
 
-By default the tool uses Gemini with `gemini-3.8-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`. Defaults favor fast text models rather than automatically choosing the most expensive flagship.
+By default the tool uses Gemini with `gemini-3.8-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`. Configured defaults and fallbacks use only the latest general-purpose text-model lineup, with defaults favoring speed and cost within that lineup.
 
 | Provider | Default model | Fallbacks | API key env var |
 |---|---|---|---|
-| `gemini` _(default)_ | `gemini-3.8-flash` | `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` | `GEMINI_API_KEY` |
-| `openai` | `gpt-6-luna` | `gpt-5.6-luna` → `gpt-5.4-mini` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-5-5` → `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
+| `gemini` _(default)_ | `gemini-3.8-flash` | none | `GEMINI_API_KEY` |
+| `openai` | `gpt-6-luna` | `gpt-6.1-sol` → `gpt-6-astra` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-sonnet-5-5` | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
 | `custom` | set with `--model` | none | `OPENAI_API_KEY` (optional) |
 
 If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
 
-Model IDs and compatibility checked against [Google's model catalog](https://ai.google.dev/gemini-api/docs/models), [OpenAI's model catalog](https://developers.openai.com/api/docs/models) and [Anthropic's model catalog](https://platform.claude.com/docs/en/models/overview) on **2026-10-02**. Haiku 4.5 remains Anthropic's current fastest tier. Anthropic fallbacks are higher-cost models; pin `--model` to avoid automatic tier changes. Google limits legacy Gemini 2.5 access for new users, so those models are no longer automatic fallbacks. Existing model names remain usable explicitly if your account supports them.
+Model IDs and compatibility checked against [Google's model catalog](https://ai.google.dev/gemini-api/docs/models), [OpenAI's model catalog](https://developers.openai.com/api/docs/models) and [Anthropic's model catalog](https://platform.claude.com/docs/en/models/overview) on **2026-10-02**. Older Gemini, GPT-5 and Haiku 4.5 models are excluded from automatic selection. Gemini has no fallback in its latest stable text generation. OpenAI and Anthropic fallbacks are higher-cost models; pin `--model` to avoid automatic tier changes. Explicit model selection and custom/local endpoints remain available. The catalog is bundled with each CLI release, rather than automatically discovering models at runtime.
 
 OpenAI and local providers retain the Chat Completions request format. Provider replies indicating truncation or blocked/incomplete output are rejected. Anthropic allows up to 16,384 output tokens per request and text blocks are collected separately from thinking blocks. Large files can still exceed a model's limits; automatic batching is future work.
 

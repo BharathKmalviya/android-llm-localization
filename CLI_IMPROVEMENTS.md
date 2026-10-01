@@ -14,8 +14,9 @@ to refresh entire locale files; preservation and previews are opt-in.
 - [x] Add `--missing-only` and `--dry-run`, without a cache or configuration system.
 - [x] Report per-locale outcomes and nonzero exits for failures.
 - [x] Reject truncated provider responses and handle text response blocks.
-- [x] Refresh stable text-model defaults and fallbacks from official docs,
-  checked on 2026-10-02; preserve custom endpoints and explicit model selection.
+- [x] Use only the latest general-purpose text-model lineup for defaults and
+  fallbacks, checked against official docs on 2026-10-02; preserve custom endpoints
+  and explicit model selection. No older-generation automatic fallbacks.
 - [x] Synchronize user docs, version and local CLI guidance; verify and commit on dev.
 
 ## Follow-up scope
@@ -51,6 +52,9 @@ needed for these improvements.
 - The 1.1.0 wheel built and installed into an isolated local target. Its CLI
   and Java verifier ran, Java source was bundled, and metadata has no runtime
   dependencies. Local fixtures and tooling are excluded from the wheel.
+- The 1.1.1 catalog update passed CLI version/models/help smoke checks and 11
+  mocked model-selection/version checks: exact latest-only lists, fallback order,
+  pinned selections, failure handling and synchronized version metadata.
 - Provider replies were simulated. No paid translation requests, native-speaker
   accuracy assessment, Android builds or device-layout checks were performed.
 - Prepared and committed on `dev`; publication remains a separate requested step.

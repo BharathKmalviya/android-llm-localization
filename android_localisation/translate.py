@@ -25,19 +25,18 @@ MAX_TIMEOUT_RETRIES = 2
 
 # Ordered list of models per provider.
 # First entry = default. Rest = automatic fallbacks (used only when user hasn't pinned a model).
+# Latest text-model lineup checked against official catalogs on 2026-10-02.
+# Do not add older-generation models as automatic fallbacks.
 PROVIDER_MODELS = {
     "gemini": [
         "gemini-3.8-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
     ],
     "openai": [
         "gpt-6-luna",
-        "gpt-5.6-luna",
-        "gpt-5.4-mini",
+        "gpt-6.1-sol",
+        "gpt-6-astra",
     ],
     "anthropic": [
-        "claude-haiku-4-5",
         "claude-sonnet-5-5",
         "claude-opus-5-5",
     ],

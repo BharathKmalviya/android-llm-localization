@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.1] - 2026-10-02
+
+### Changed
+- Automatic model selection now uses only the latest general-purpose text-model lineup verified against official catalogs on 2026-10-02. Removed older-generation Gemini, GPT-5 and Haiku 4.5 entries.
+- Gemini retains `gemini-3.8-flash` with no fallback. OpenAI retains `gpt-6-luna`, with `gpt-6.1-sol` and `gpt-6-astra` fallbacks. Anthropic now defaults to `claude-sonnet-5-5`, with `claude-opus-5-5` as its fallback.
+- Documented higher-cost fallback tiers and the bundled catalog. Explicit `--model` choices and custom/local endpoints remain supported.
+
+---
+
 ## [1.1.0] - 2026-10-02
 
 ### Added
