@@ -13,7 +13,7 @@ import sys
 from android_localisation import __version__
 
 
-def main():
+def main(args=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -57,8 +57,18 @@ def main():
     models_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic"], default=None,
                                help="Filter by provider (shows all if not set)")
 
-    args = parser.parse_args()
+    if args is None or isinstance(args, list):
+        args = parser.parse_args(args)
 
+    from android_localisation.updates import start_update_check, show_update_notice
+    update_state = start_update_check()
+    try:
+        return _run_command(args)
+    finally:
+        show_update_notice(update_state)
+
+
+def _run_command(args):
     if args.command == "translate":
         from android_localisation.translate import main as run
         return run(args)

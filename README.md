@@ -28,6 +28,24 @@ Requires Python 3.8+. No other dependencies.
 
 CLI output uses UTF-8, including when redirected to a file or pipe on Windows.
 
+### Update notices
+
+Interactive `android-localise` commands check PyPI for a newer stable release in
+the background, at most once every 24 hours. When available, a note on stderr
+shows `pip install --upgrade android-localisation`. The CLI never waits for the
+lookup or installs an update automatically. A first short command may finish
+before the lookup completes; a notice appears when a check completes during a
+command or a later invocation can use its cached result.
+
+Checks are skipped for help/version output, CI (`CI` set), redirected output and
+pipes. Set `ANDROID_LOCALISE_NO_UPDATE_CHECK=1` to disable them, including when
+using a local model offline. Lookup or cache failures stay silent and do not
+change command exit codes. The small cache lives under
+`%LOCALAPPDATA%/android-localisation` on Windows, or
+`${XDG_CACHE_HOME:-~/.cache}/android-localisation` elsewhere. Only the package's
+public release metadata is requested; API keys and Android resources are never
+included.
+
 ---
 
 ## Quick start
@@ -261,6 +279,8 @@ android-localise translate
 | `OPENAI_API_KEY` | `--provider openai` and `--provider custom` |
 | `ANTHROPIC_API_KEY` | `--provider anthropic` |
 | `API_KEY` | fallback for any provider if the provider-specific var is not set |
+| `ANDROID_LOCALISE_NO_UPDATE_CHECK` | Set to `1` to disable update checks/notices |
+| `CI` | When nonempty, skips update checks/notices |
 
 ---
 
