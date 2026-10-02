@@ -11,23 +11,13 @@ import time
 import unicodedata
 
 from android_localisation.resources import atomic_write
+from android_localisation.locales import GOOGLE_PLAY_LOCALES
 from android_localisation.translate import (
     DEFAULT_API_TIMEOUT, MAX_TIMEOUT_RETRIES, PROVIDER_MODELS, _call_provider,
 )
 
 FIELD_LIMITS = {"app_name": 30, "short_description": 80, "full_description": 4000}
 MAX_VALIDATION_RETRIES = 2
-# Store-listing locales (not Play Console UI or machine-translation languages).
-# Verified on 2026-10-02 against the "View list of available languages" section:
-# https://support.google.com/googleplay/android-developer/answer/9844778?hl=en
-GOOGLE_PLAY_LOCALES = tuple("""
-af sq am ar hy-AM az-AZ bn-BD eu-ES be bg my-MM ca zh-HK zh-CN zh-TW
-hr cs-CZ da-DK nl-NL en-AU en-CA en-US en-GB en-IN en-SG en-ZA et fil
-fi-FI fr-CA fr-FR gl-ES ka-GE de-DE el-GR gu iw-IL hi-IN hu-HU is-IS id
-it-IT ja-JP kn-IN kk km-KH ko-KR ky-KG lo-LA lv lt mk-MK ms-MY ms ml-IN
-mr-IN mn-MN ne-NP no-NO fa fa-AE fa-AF fa-IR pl-PL pt-BR pt-PT pa ro rm
-ru-RU sr si-LK sk sl es-419 es-ES es-US sw sv-SE ta-IN te-IN th tr-TR uk ur vi
-""".split())
 LOCALE_PATTERN = re.compile(
     r"([A-Za-z]{2,3})(?:-([A-Za-z]{4}))?(?:-([A-Za-z]{2}|[0-9]{3}))?\Z"
 )

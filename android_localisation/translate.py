@@ -19,6 +19,8 @@ from android_localisation.resources import (
     missing_resources, parse_resources, validate_resources,
 )
 
+from android_localisation.locales import all_android_locales
+
 DEFAULT_RES_DIR = "app/src/main/res"
 DEFAULT_API_TIMEOUT = 180  # seconds (3 minutes) — large strings.xml files can exceed 60s
 MAX_TIMEOUT_RETRIES = 2
@@ -54,6 +56,11 @@ def ensure_locale_dirs(res_dir, languages, create=True):
     Creates values-<lang> directories for each language code in the list.
     Returns the list of folder names created or already existing.
     """
+    languages = [lang.strip() for lang in languages]
+    if len(languages) == 1 and languages[0].lower() == "all":
+        languages = all_android_locales()
+    elif any(lang.lower() == "all" for lang in languages):
+        raise ValueError("use --languages all alone, or specify a comma-separated Android locale list")
     created = []
     # Validate the entire list before creating any directories.
     for lang in languages:
@@ -307,7 +314,7 @@ def _parse_args(args=None):
     parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
     parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
                         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})")
-    parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
+    parser.add_argument("--languages", help="'all' for 86 bundled locales, or comma-separated Android locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
     parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
     return parser.parse_args(args)

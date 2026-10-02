@@ -28,6 +28,7 @@ def main(args=None):
   android-localise verify
 
 Other examples:
+  android-localise translate --languages all
   android-localise store-listing --source listing.json --languages all
   android-localise store-listing --source listing.json --languages hi,es-ES
   android-localise translate --languages hi --missing-only --dry-run
@@ -52,6 +53,7 @@ Output is validated before saving. Existing locale files are refreshed by
 default; --missing-only preserves existing resources and fills missing ones.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
+  android-localise translate --languages all
   android-localise translate --languages hi,es --app-context "a notes app"
   android-localise translate --provider openai --res-dir path/to/res
   android-localise translate --languages hi --missing-only --dry-run
@@ -74,7 +76,7 @@ Use android-localise models to see current defaults and fallbacks.""",
         "--timeout", type=float, default=DEFAULT_API_TIMEOUT,
         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
     )
-    translate_parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
+    translate_parser.add_argument("--languages", help="'all' for 86 bundled locales, or comma-separated Android locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
     translate_parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     translate_parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
 

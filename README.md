@@ -94,7 +94,7 @@ That's the full workflow. Run these three commands after every time you update y
 When you run `android-localise translate --api-key YOUR_KEY`, here's exactly what it does:
 
 1. Looks for `app/src/main/res/values/strings.xml` — this is your English source
-2. If `--languages` is provided, selects those locales. Otherwise scans existing locale folders, skipping configuration-only folders such as `values-night`, `values-land`, `values-car`, and `values-sw600dp`
+2. If `--languages all` is provided, selects the 86 bundled Play locales mapped to Android resource qualifiers. A comma-separated `--languages` list selects those Android locales. Otherwise scans existing locale folders, skipping configuration-only folders such as `values-night`, `values-land`, `values-car`, and `values-sw600dp`
 3. Sends your English XML to the LLM with app context and instructions to preserve resource structure, protected values, namespaces and format specifiers. With `--missing-only`, requests only resources absent from the target file; existing resources remain untouched, and complete locales make no API request
 4. Parses the response and checks duplicate/unexpected/missing resources, attributes, inline markup, item structure, control escapes and format arguments. A valid result replaces the file atomically; new folders are created only when saving. `--dry-run` shows a diff without writing any files or creating folders
 5. Waits 5 seconds between each language request to avoid hitting API rate limits
@@ -126,6 +126,26 @@ For target languages, you have two options:
 android-localise translate --api-key YOUR_KEY --languages hi,es,fr,de
 ```
 This translates into Hindi, Spanish, French and German, creating each folder and `strings.xml` when its translation passes validation.
+
+To translate into the same 86-locale catalog used for store listings:
+
+```bash
+android-localise translate --api-key YOUR_KEY --languages all
+```
+
+`all` is case-insensitive and must be used alone. The bundled catalog is shared
+with `store-listing` and mapped to [Android resource qualifiers](https://developer.android.com/guide/topics/resources/providing-resources#AlternativeResources):
+`hi-IN` becomes `values-hi-rIN`, `pt-BR` becomes `values-pt-rBR`, `es-419`
+becomes `values-b+es+419`, and `fil` becomes `values-b+fil`. Regional variants,
+including English ones, remain separate; `values/strings.xml` remains the source.
+This is the bundled Play locale set, not every possible Android locale.
+
+The same XML validation, atomic saves, delay, `--missing-only` and `--dry-run`
+behavior applies to each locale. Normal translation refreshes existing files;
+use `--languages all --missing-only` to keep reviewed resources. Generating or
+previewing all locales can use 86 translation requests plus provider retries;
+complete locales in missing-only mode skip API calls. No folders are created
+during previews or before their translation passes validation.
 
 **Option B — pre-create folders yourself:**
 ```
@@ -180,7 +200,7 @@ android-localise translate \
 | `--api-key` | Your API key | reads from env var |
 | `--provider` | Which AI to use: `gemini` `openai` `anthropic` `custom` | `gemini` |
 | `--model` | Specific model to use | see [Providers](#providers) |
-| `--languages` | Comma-separated language codes — creates folders and files automatically | — |
+| `--languages` | `all` for 86 bundled locales, or comma-separated Android codes such as `hi,es-rES,b+es+419` | scan existing locale folders |
 | `--app-context` | One-line description of your app | — |
 | `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
 | `--base-url` | API endpoint for local/custom providers | — |

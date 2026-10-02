@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] - 2026-10-02
+
+### Added
+- `translate --languages all` selects the same 86-locale catalog as store listings, mapped to Android resource folders: language/region qualifiers such as `values-hi-rIN` and BCP 47 forms such as `values-b+es+419` and `values-b+fil`.
+- Shares the bundled locale catalog between XML and listing translation. Manual Android locale selection and omitted-flag folder discovery remain unchanged; mixed all/manual lists are rejected before API requests or directory creation. Existing XML validation, atomic saves, previews and missing-only preservation apply to all selected locales.
+
+---
+
 ## [1.3.0] - 2026-10-02
 
 ### Added
