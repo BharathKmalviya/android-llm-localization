@@ -19,6 +19,10 @@ from android_localisation.resources import (
     missing_resources, parse_resources, validate_resources,
 )
 
+from android_localisation.locales import (
+    all_android_locales, android_locale, language_items, normalize_play_locale, select_locales,
+)
+
 DEFAULT_RES_DIR = "app/src/main/res"
 DEFAULT_API_TIMEOUT = 180  # seconds (3 minutes) — large strings.xml files can exceed 60s
 MAX_TIMEOUT_RETRIES = 2
@@ -49,22 +53,42 @@ def get_target_directories(res_dir):
     return locale_folders(res_dir)
 
 
-def ensure_locale_dirs(res_dir, languages, create=True):
+def normalize_android_folder(value):
+    value = value.strip()
+    if not value:
+        raise ValueError("empty Android locale")
+    # Preserve existing Android forms; also accept conventional language tags.
+    if not value.startswith(("values-", "b+")) and "-" in value:
+        try:
+            value = android_locale(value)
+        except ValueError:
+            pass  # May be an Android qualifier such as es-rES or en-night.
+    folder = value if value.startswith("values-") else "values-" + value
+    if not is_locale_folder(folder):
+        raise ValueError("invalid Android locale: {} (use hi, es-rES, es-ES or b+zh+Hans)".format(value))
+    return folder
+
+
+def _android_identity(folder):
+    qualifier = folder[len("values-"):]
+    if qualifier.startswith("b+"):
+        qualifier = qualifier[2:].replace("+", "-")
+    return re.sub(r"-r([A-Z]{2}|\d{3})(?=-|$)", r"-\1", qualifier).lower()
+
+
+def ensure_locale_dirs(res_dir, languages, create=True, excluded=None):
     """
     Creates values-<lang> directories for each language code in the list.
     Returns the list of folder names created or already existing.
     """
-    created = []
+    languages = [lang.strip() for lang in languages]
+    # Historical manual Android lists ignore empty entries.
+    languages = [lang for lang in languages if lang]
+    created = select_locales(
+        languages, normalize_android_folder,
+        ["values-" + locale for locale in all_android_locales()], excluded, _android_identity,
+    )
     # Validate the entire list before creating any directories.
-    for lang in languages:
-        lang = lang.strip()
-        if not lang:
-            continue
-        folder = f"values-{lang}" if not lang.startswith("values-") else lang
-        if not is_locale_folder(folder):
-            raise ValueError("invalid Android locale: {} (use hi, es-rES or b+zh+Hans)".format(lang))
-        if folder not in created:
-            created.append(folder)
     for folder in created:
         folder_path = os.path.join(res_dir, folder)
         if create and not os.path.exists(folder_path):
@@ -78,11 +102,11 @@ def read_source_xml(source_path):
         return f.read()
 
 
-def build_prompt(source_xml, target_folder_name, app_context):
+def build_prompt(source_xml, target_folder_name, app_context, source_language="en-US"):
     context_str = f"an Android app ({app_context})" if app_context else "an Android application"
     return f"""You are a professional Android localization expert.
 
-Translate the English `strings.xml` below for {context_str} into the language for Android resource directory: `{target_folder_name}`.
+Translate the `strings.xml` below from {source_language} for {context_str} into the language for Android resource directory: `{target_folder_name}`.
 For example, `values-hi` is Hindi, `values-es-rES` is Spanish (Spain), `values-zh-rTW` is Traditional Chinese, `values-ar` is Arabic, etc.
 
 STRICT GUIDELINES:
@@ -265,13 +289,14 @@ def _call_provider(provider, api_key, model, prompt, base_url=None, timeout=DEFA
 
 
 def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_context,
-                  base_url=None, fallback_models=None, timeout=DEFAULT_API_TIMEOUT, only_resources=None):
+                  base_url=None, fallback_models=None, timeout=DEFAULT_API_TIMEOUT, only_resources=None,
+                  source_language="en-US"):
     """
     Calls the selected provider API to translate the XML.
     If the model is not found and fallback_models are provided, retries with the next one.
     Returns (translated_xml, model_used).
     """
-    prompt = build_prompt(source_xml, target_folder_name, app_context)
+    prompt = build_prompt(source_xml, target_folder_name, app_context, source_language)
     if only_resources is not None:
         prompt += "\nMISSING-ONLY UPDATE: The source above provides context. Return a <resources> document " \
                   "containing ONLY these resource types and names, retaining their original attributes " \
@@ -295,10 +320,11 @@ def translate_xml(provider, api_key, model, source_xml, target_folder_name, app_
 
 def _parse_args(args=None):
     parser = argparse.ArgumentParser(
-        description="Translate values/strings.xml using LLMs; validate output before saving. Existing locale files are refreshed unless --missing-only is set.",
+        description="Translate source XML using LLMs; validate output before saving. Existing locale files are refreshed unless --missing-only or --skip-existing is set.",
         epilog="Use python -m android_localisation translate --help for workflow examples, or python -m android_localisation models for model defaults.",
     )
     parser.add_argument("--res-dir", default=DEFAULT_RES_DIR, help="Path to the Android res/ directory (default: app/src/main/res)")
+    add_flexible_arguments(parser)
     parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
     parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
     parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
@@ -307,10 +333,19 @@ def _parse_args(args=None):
     parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
     parser.add_argument("--timeout", type=float, default=DEFAULT_API_TIMEOUT,
                         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})")
-    parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
+    parser.add_argument("--languages", help="Comma-separated Android or Play tags and/or 'all' (hi,es-ES,b+zh+Hans,all,zu)")
     parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
     return parser.parse_args(args)
+
+
+def add_flexible_arguments(parser):
+    parser.add_argument("--source", help="Source XML path (default: RES_DIR/values/strings.xml)")
+    parser.add_argument("--source-language", default="en-US", help="Source XML language tag (default: en-US)")
+    parser.add_argument("--output-dir", help="Destination Android res/ directory (default: --res-dir)")
+    parser.add_argument("--languages-file", help="UTF-8 comma/newline language list; combines with --languages")
+    parser.add_argument("--exclude-languages", help="Comma-separated Android or Play tags to exclude after selection")
+    parser.add_argument("--skip-existing", action="store_true", help="Validate and skip existing files without API calls; incompatible with --missing-only")
 
 
 def main(args=None):
@@ -322,6 +357,10 @@ def main(args=None):
 
     missing_only = getattr(args, "missing_only", False)
     dry_run = getattr(args, "dry_run", False)
+    skip_existing = getattr(args, "skip_existing", False)
+    if skip_existing and missing_only:
+        print("❌ ERROR: Choose --skip-existing or --missing-only, not both.")
+        return 1
     if not math.isfinite(args.sleep) or args.sleep < 0 or not math.isfinite(args.timeout) or args.timeout <= 0:
         print("❌ ERROR: --sleep must be finite and nonnegative; --timeout must be finite and positive.")
         return 1
@@ -359,22 +398,30 @@ def main(args=None):
         print("❌ ERROR: You must provide --base-url when using a custom provider.")
         return 1
 
-    res_dir = args.res_dir
-    source_strings_xml = os.path.join(res_dir, "values", "strings.xml")
+    res_dir = getattr(args, "output_dir", None) or args.res_dir
+    source_strings_xml = getattr(args, "source", None) or os.path.join(args.res_dir, "values", "strings.xml")
 
     print(f"🔍 Reading source XML from: {source_strings_xml}")
     if not os.path.exists(source_strings_xml):
-        print("❌ ERROR: Could not find English strings.xml at the specified path.")
+        print("❌ ERROR: Could not find source XML at the specified path.")
         return 1
 
     try:
         source_xml = read_source_xml(source_strings_xml)
         parse_resources(source_xml)
+        source_language = normalize_play_locale(getattr(args, "source_language", "en-US"))
         # Translation never needs to create folders before the response is valid.
-        if args.languages:
-            target_dirs = ensure_locale_dirs(res_dir, args.languages.split(","), create=False)
+        if args.languages is not None or getattr(args, "languages_file", None):
+            items = language_items(args.languages, getattr(args, "languages_file", None))
         else:
-            target_dirs = get_target_directories(res_dir)
+            items = get_target_directories(res_dir)
+        target_dirs = ensure_locale_dirs(res_dir, items, create=False,
+                                        excluded=language_items(getattr(args, "exclude_languages", None)))
+        for folder in target_dirs:
+            path = os.path.join(res_dir, folder, "strings.xml")
+            if os.path.normcase(os.path.realpath(path)) == os.path.normcase(os.path.realpath(source_strings_xml)) or (
+                    os.path.exists(path) and os.path.samefile(path, source_strings_xml)):
+                raise ValueError("output would replace the source XML: {}".format(path))
     except (OSError, ValueError) as exc:
         print("❌ ERROR: {}".format(exc))
         return 1
@@ -398,11 +445,18 @@ def main(args=None):
 
         if is_new_file:
             print(f"⏳ [{folder}] No strings.xml found — creating and translating...")
+        elif skip_existing:
+            print(f"⏳ [{folder}] Validating existing strings.xml...")
         else:
             print(f"⏳ [{folder}] Updating existing strings.xml...")
 
         try:
             existing_xml = read_source_xml(target_path) if not is_new_file else ""
+            if skip_existing and not is_new_file:
+                validate_resources(source_xml, existing_xml)
+                print("⏭️  [{}] Existing valid file skipped.".format(folder))
+                skipped += 1
+                continue
             if missing_only and not is_new_file and not existing_xml.strip():
                 raise ValueError("existing file is empty XML; use normal translation to regenerate it")
             missing = missing_resources(source_xml, existing_xml) if missing_only else None
@@ -413,7 +467,7 @@ def main(args=None):
             translated_xml, used_model = translate_xml(
                 actual_provider, api_key, model, source_xml,
                 folder, args.app_context, args.base_url, fallback_models, args.timeout,
-                only_resources=missing
+                only_resources=missing, source_language=source_language
             )
             if not translated_xml:
                 raise ValueError("API returned no usable translation")

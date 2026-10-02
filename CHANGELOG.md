@@ -7,6 +7,43 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] - 2026-10-02
+
+### Added
+- Composable translation commands: combine `all` and manual languages, reuse UTF-8 `--languages-file` lists and apply `--exclude-languages` after selection. Listing translation can use a language file instead of `--languages`. Stable ordering and duplicate removal are retained.
+- XML translation accepts conventional language tags alongside Android qualifiers, deduplicating equivalent folder forms. `--source`, `--source-language` and `--output-dir` support other XML source paths/languages and separate output directories. `--skip-existing` validates and skips existing files; current whole-file refresh and missing-only defaults remain.
+
+### Fixed
+- Reject source/output collisions, including linked files, before XML translation can overwrite its input. Empty or invalid language selections fail before requests or folder creation; incompatible XML preservation flags are reported.
+
+---
+
+## [1.4.0] - 2026-10-02
+
+### Added
+- `translate --languages all` selects the same 86-locale catalog as store listings, mapped to Android resource folders: language/region qualifiers such as `values-hi-rIN` and BCP 47 forms such as `values-b+es+419` and `values-b+fil`.
+- Shares the bundled locale catalog between XML and listing translation. Manual Android locale selection and omitted-flag folder discovery remain unchanged; mixed all/manual lists are rejected before API requests or directory creation. Existing XML validation, atomic saves, previews and missing-only preservation apply to all selected locales.
+
+---
+
+## [1.3.0] - 2026-10-02
+
+### Added
+- `store-listing --languages all` selects all 86 Google Play store-listing locales from the official language list verified on 2026-10-02, including regional variants. The catalog ships with the CLI, without runtime lookups.
+- Manual comma-separated language selection remains available. `all` is case-insensitive and must be used alone; mixed all/manual lists are rejected. Existing skip, overwrite, preview, validation, retry and API-delay behavior applies to every selected locale.
+
+---
+
+## [1.2.0] - 2026-10-02
+
+### Added
+- `store-listing` translates a UTF-8 JSON Google Play app name, short description and full description into selected Play locales, using existing providers, key resolution, pinned models, fallback and timeout behavior.
+- Validates all three required fields against 30/80/4,000-character limits and rejects invalid JSON, duplicate/extra/missing keys, blank fields, control characters and multiline names/short descriptions. Invalid model output receives up to two correction requests with feedback; rejected output leaves existing files intact.
+- Atomic per-locale JSON saves, field character counts, per-locale results, nonzero failure exits, and source/output collision protection. Existing valid listings skip by default; `--overwrite` refreshes them, `--dry-run` previews diffs, and `--keep-app-name` preserves the source name exactly.
+- Store-listing prompts incorporate the supplied metadata, Help Centre, programme-policy and advance-notice links with accurate-description and short-description guidance. They preserve factual disclosures and discourage invented claims, ranking/promotion language, keyword stuffing and misleading affiliations. Policy guidance remains a prompt instruction and manual review responsibility; the CLI does not upload listings or send advance notice.
+
+---
+
 ## [1.1.3] - 2026-10-02
 
 ### Added

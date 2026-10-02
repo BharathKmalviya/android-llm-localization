@@ -6,7 +6,7 @@
 
 **PyPI:** [`android-localisation`](https://pypi.org/project/android-localisation/) · **CLI:** `android-localise` · **Repo:** [android-llm-localization](https://github.com/BharathKmalviya/android-llm-localization)
 
-Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid translation service, no CSV exports, no copy-paste.
+Translate your Android `strings.xml` and Google Play store listing into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama.
 
 ---
 
@@ -93,10 +93,10 @@ That's the full workflow. Run these three commands after every time you update y
 
 When you run `android-localise translate --api-key YOUR_KEY`, here's exactly what it does:
 
-1. Looks for `app/src/main/res/values/strings.xml` — this is your English source
-2. If `--languages` is provided, selects those locales. Otherwise scans existing locale folders, skipping configuration-only folders such as `values-night`, `values-land`, `values-car`, and `values-sw600dp`
-3. Sends your English XML to the LLM with app context and instructions to preserve resource structure, protected values, namespaces and format specifiers. With `--missing-only`, requests only resources absent from the target file; existing resources remain untouched, and complete locales make no API request
-4. Parses the response and checks duplicate/unexpected/missing resources, attributes, inline markup, item structure, control escapes and format arguments. A valid result replaces the file atomically; new folders are created only when saving. `--dry-run` shows a diff without writing any files or creating folders
+1. Reads `app/src/main/res/values/strings.xml` by default, or the XML file supplied with `--source`. `--source-language` identifies its language (default `en-US`)
+2. Combines `--languages` and `--languages-file`, expands `all`, removes duplicates and applies `--exclude-languages`. Android qualifiers and conventional language tags are accepted. Without an explicit list, scans existing locale folders in the destination directory, skipping configuration-only folders such as `values-night`, `values-land`, `values-car`, and `values-sw600dp`. The destination defaults to `--res-dir`, or can be set with `--output-dir`
+3. Sends the source XML to the LLM with its language, app context and instructions to preserve resource structure, protected values, namespaces and format specifiers. With `--missing-only`, requests only resources absent from the target file; existing resources remain untouched, and complete locales make no API request
+4. Parses the response and checks duplicate/unexpected/missing resources, attributes, inline markup, item structure, control escapes and format arguments. A valid result replaces the file atomically; new folders are created only when saving. `--skip-existing` validates existing files and skips them without API calls. `--dry-run` shows a diff without writing any files or creating folders
 5. Waits 5 seconds between each language request to avoid hitting API rate limits
 
 **Defaults used when you don't specify anything:**
@@ -117,7 +117,8 @@ Normal translation still replaces the whole locale file. Use `--missing-only` to
 
 ## Setup
 
-The only requirement is that `app/src/main/res/values/strings.xml` exists — your English source file.
+Provide source XML at `app/src/main/res/values/strings.xml` by default, or supply
+another file with `--source` and its language with `--source-language`.
 
 For target languages, you have two options:
 
@@ -126,6 +127,26 @@ For target languages, you have two options:
 android-localise translate --api-key YOUR_KEY --languages hi,es,fr,de
 ```
 This translates into Hindi, Spanish, French and German, creating each folder and `strings.xml` when its translation passes validation.
+
+To translate into the same 86-locale catalog used for store listings:
+
+```bash
+android-localise translate --api-key YOUR_KEY --languages all
+```
+
+`all` is case-insensitive and can be combined with extra languages. The bundled catalog is shared
+with `store-listing` and mapped to [Android resource qualifiers](https://developer.android.com/guide/topics/resources/providing-resources#AlternativeResources):
+`hi-IN` becomes `values-hi-rIN`, `pt-BR` becomes `values-pt-rBR`, `es-419`
+becomes `values-b+es+419`, and `fil` becomes `values-b+fil`. Regional variants,
+including English ones, remain separate; `values/strings.xml` remains the source.
+This is the bundled Play locale set, not every possible Android locale.
+
+The same XML validation, atomic saves, delay, `--missing-only` and `--dry-run`
+behavior applies to each locale. Normal translation refreshes existing files;
+use `--languages all --missing-only` to keep reviewed resources. Generating or
+previewing all locales can use 86 translation requests plus provider retries;
+complete locales in missing-only mode skip API calls. No folders are created
+during previews or before their translation passes validation.
 
 **Option B — pre-create folders yourself:**
 ```
@@ -136,7 +157,7 @@ app/src/main/res/
 ├── values-es/
 └── values-fr/
 ```
-Run `android-localise translate --api-key YOUR_KEY` and it picks up locale folders, creating `strings.xml` inside each one after successful translation. Locale examples include `values-hi`, `values-es-rES`, `values-b+zh+Hans`, and `values-en-night`; qualifier-only folders are skipped. `--languages` accepts the same forms without the optional `values-` prefix and rejects path separators or non-locale names.
+Run `android-localise translate --api-key YOUR_KEY` and it picks up locale folders, creating `strings.xml` inside each one after successful translation. Locale examples include `values-hi`, `values-es-rES`, `values-b+zh+Hans`, and `values-en-night`; qualifier-only folders are skipped. `--languages` accepts the same forms without the optional `values-` prefix, plus conventional tags such as `es-ES` or `zh-Hant-TW`, and rejects path separators or non-locale names.
 
 **Get a free API key:** [Google Gemini AI Studio](https://aistudio.google.com/) → Get API Key. The free tier handles most apps without hitting limits.
 
@@ -149,6 +170,7 @@ typical workflow. Each command has detailed help with its options and examples:
 
 ```bash
 android-localise translate --help
+android-localise store-listing --help
 android-localise fix --help
 android-localise verify --help
 android-localise models --help
@@ -179,7 +201,13 @@ android-localise translate \
 | `--api-key` | Your API key | reads from env var |
 | `--provider` | Which AI to use: `gemini` `openai` `anthropic` `custom` | `gemini` |
 | `--model` | Specific model to use | see [Providers](#providers) |
-| `--languages` | Comma-separated language codes — creates folders and files automatically | — |
+| `--languages` | Comma-separated Android/conventional codes and/or `all`, e.g. `all,zu` or `hi,es-ES,b+es+419` | scan existing destination locale folders |
+| `--languages-file` | UTF-8 comma/newline language list; combines with `--languages` | none |
+| `--exclude-languages` | Remove exact normalized locales after selection/discovery | none |
+| `--source` | Read a custom XML source file | `RES_DIR/values/strings.xml` |
+| `--source-language` | Language tag for source XML | `en-US` |
+| `--output-dir` | Save translated XML into this Android res/ directory | `--res-dir` |
+| `--skip-existing` | Validate and skip existing XML files without API calls | off; incompatible with `--missing-only` |
 | `--app-context` | One-line description of your app | — |
 | `--res-dir` | Path to your `res/` folder | `app/src/main/res` |
 | `--base-url` | API endpoint for local/custom providers | — |
@@ -198,6 +226,172 @@ android-localise translate --languages hi --missing-only --dry-run
 `--dry-run` still calls the selected provider and may incur API charges. It is a translation preview, not a no-network estimate. `--missing-only` keeps existing resources, comments and text, but validates them against the current source first. An invalid existing file is reported rather than silently repaired. It does not detect changed English text for an existing key; use the normal translation mode when you deliberately want to refresh those resources. Arrays and plurals count as whole resources: this mode does not fill individual missing items.
 
 Validation permits positional placeholder reordering such as `%s %d` becoming `%2$d %1$s`, while checking argument identities, conversions, formatting options and occurrence counts. Non-translatable resources may be omitted from locale files to use Android's default fallback, but must remain unchanged if included.
+
+---
+
+### `store-listing`
+
+Translate an existing Google Play listing's **app name**, **short description**
+and **full description**, using the same providers, keys, model defaults,
+model-not-found fallbacks and timeout handling as `translate`.
+
+Create a UTF-8 `listing.json` containing exactly these three nonempty strings:
+
+```json
+{
+  "app_name": "Pocket Notes",
+  "short_description": "Write and organize your notes",
+  "full_description": "Write notes and organize them in folders.\n\nFind saved notes with search."
+}
+```
+
+Use your actual app details. JSON represents paragraph breaks as `\n`; this
+command translates supplied copy and does not infer features from Android XML.
+
+```bash
+# Translate every bundled Google Play listing locale
+android-localise store-listing --source listing.json --languages all
+# Or select languages manually
+android-localise store-listing --source listing.json --languages hi,es-ES,pt-BR
+# Keep the original brand/app name and preview translations
+android-localise store-listing --source listing.json --languages ja,zh-TW --keep-app-name --dry-run
+# Explicitly refresh reviewed files when the source changes
+android-localise store-listing --source listing.json --languages hi --overwrite
+```
+
+Outputs are readable UTF-8 `store-listings/hi.json`, `store-listings/es-ES.json`,
+etc., with the same three keys. Review the text and copy each field into its
+language's Play Console listing; JSON is a local output format, not a Play
+Console import file. The CLI does not upload or publish a listing.
+
+| Flag | Description | Default |
+|---|---|---|
+| `--source` | UTF-8 JSON source listing | required |
+| `--languages` | Play tags and/or `all`, e.g. `all,zu` or `hi-IN,es-ES` | required unless `--languages-file` supplies a list |
+| `--languages-file` | UTF-8 comma/newline language list; combines with `--languages` | none |
+| `--exclude-languages` | Remove exact normalized Play tags after selection | none |
+| `--source-language` | Source listing language tag | `en-US` |
+| `--output-dir` | Directory for `LOCALE.json` output | `store-listings` |
+| `--keep-app-name` | Preserve the source app name exactly | off; name is localized with brand-preservation instructions |
+| `--overwrite` | Replace existing locale files after validation | off; existing valid files are skipped |
+| `--dry-run` | Generate, validate and display diffs without files/directories being written | off; API usage applies |
+| `--provider` | `gemini`, `openai`, `anthropic`, `custom` | `gemini` |
+| `--model` | Pin any supported model and disable fallbacks | provider default |
+| `--api-key` | Key, or provider-specific environment variable / `API_KEY` | environment |
+| `--base-url` | OpenAI-compatible endpoint; required for `custom` | provider endpoint |
+| `--app-context` | Terminology context; source copy remains the source of facts | none |
+| `--sleep` | Delay between requests, including correction/fallback requests | `5.0` seconds |
+| `--timeout` | Per-response timeout; up to three attempts on timeout | `180` seconds |
+
+**Validation:** source and translated fields must fit **30 / 80 / 4,000 characters**
+respectively, as specified in [Google Play's product details guidance](https://support.google.com/googleplay/android-developer/answer/9859152).
+Counts use Python Unicode code points, including spaces, punctuation, newlines
+and any HTML markup, rather than UTF-8 bytes or visual glyphs. Check final counts
+in Play Console too. Names and short descriptions must be single-line text.
+Missing/extra/duplicate keys, blank fields, invalid JSON, unsupported controls
+and unpaired surrogates are rejected. Overlong or otherwise invalid model output
+gets up to **two correction requests**, with validation feedback; this can incur
+additional API usage. Text is never blindly truncated. After validation the
+complete listing is saved atomically. Rejected output preserves existing files;
+other languages continue and any failure produces exit code 1.
+
+Existing files are validated and skipped without translation API calls unless
+`--overwrite` is set, including during a dry run. An invalid existing file fails
+instead of being silently replaced; `--overwrite` explicitly regenerates it.
+`--dry-run --overwrite` previews changes to existing files. Source/output path
+collisions are rejected. Locale tags are syntax-checked and normalized (for
+example `pt-br` becomes `pt-BR`); duplicate tags run once. This does not check
+manual codes against Google Play's supported-language catalog. Choose tags available in your Console;
+Android forms such as `values-hi`, `es-rES` and `b+zh+Hans` are not accepted here.
+
+`--languages all` expands to the **86 store-listing locales** in
+[Google Play's available-language list](https://support.google.com/googleplay/android-developer/answer/9844778?hl=en),
+verified on **2026-10-02** and bundled with this release. It includes regional
+variants and the source locale if present in the list. It does not fetch or
+change the catalog at runtime. `all` is case-insensitive and can be combined with
+manual additions. Use `--languages`, `--languages-file`, or both. Manual selection retains normalization and
+duplicate removal. Each locale uses its own request, subject to existing-file
+skips, correction/fallback requests and the configured delay. API usage applies
+to all generated locales, including previews. Existing valid files still skip
+unless `--overwrite` is set.
+
+**Translation prompt:** includes the supplied [metadata policy](https://play.google.com/about/storelisting-promotional/metadata),
+[Help Centre guidance](https://support.google.com/googleplay/android-developer/answer/9866151),
+[programme policies](https://play.google.com/about/developer-content-policy) and
+[advance-notice guidance](https://support.google.com/googleplay/android-developer/answer/6320428)
+as publishing references, alongside text guidance reviewed on **2026-10-02**.
+It asks for accurate, natural descriptions without invented claims, keyword
+stuffing, misleading affiliations or anonymous testimonials. App names and
+short descriptions avoid ranking/promotion language and decorative emoji;
+short descriptions also avoid calls to action. Existing factual limitations,
+URLs, brand names, required disclosures and full-description markup should be
+preserved. Unsupported promotional wording should become factual copy.
+These semantic rules are prompt instructions, not automated policy checks.
+No policy pages are fetched by the CLI at runtime, so review the current linked
+policies and translated claims before submitting. Advance notice remains a
+separate developer step if eligible; no notice, permission or approval is implied.
+
+**Manual check:** translate two languages, review all three fields with a native
+speaker and check their counts in Play Console. Rerun to confirm existing files
+skip, then use `--overwrite --dry-run` to review refreshes without saving.
+Try a source name longer than 30 characters to confirm rejection before any
+translation request.
+For all-locale coverage, run `--languages all` into a separate output directory,
+confirm 86 successful JSON outputs, then rerun and confirm 86 skips. Use a manual
+list such as `hi-IN,es-ES` to confirm only those two outputs are generated.
+
+---
+
+### Composing translation commands
+
+Both commands accept languages from the CLI, a UTF-8 file, or both. File entries
+can be comma-separated or one per line, with blank lines and `#` comments.
+For example, `languages.txt` can contain:
+
+```text
+# Shared targets; conventional tags work in both commands
+hi-IN
+es-ES,pt-BR
+zh-Hant-TW
+```
+
+```bash
+# All bundled locales plus an extra, excluding exact regional variants
+android-localise translate --languages all,zu --exclude-languages en-US,en-GB
+android-localise store-listing --source listing.json --languages all,zu --exclude-languages en-US,en-GB
+# Reuse a language file and add more targets
+android-localise translate --languages-file languages.txt --languages de-DE --dry-run
+android-localise store-listing --source listing.json --languages-file languages.txt --languages de-DE --dry-run
+# Translate another source language into a separate Android resource directory
+android-localise translate --source source/strings.xml --source-language fr-FR --output-dir translated/res --languages hi-IN,es-ES --skip-existing
+```
+
+Ordering is CLI entries first, then file entries. `all` expands wherever it
+appears; duplicates run once. XML equivalent qualifiers such as `es-ES`,
+`es-rES` and `b+es+ES` run once, preserving the first selected folder spelling.
+Exclusions apply after expansion and use exact locale identity: excluding `en`
+does not exclude `en-US` or every English region. You can pass Android forms to
+XML exclusions, and conventional tags to both commands. Listing language files
+accept Play tags only. Manual tags are syntax-checked, not restricted to the
+bundled Play catalog; verify Play Console supports any additional listing locale.
+An empty final selection or invalid language/file fails before API calls or
+folder creation. Source/output collisions, including linked source files, are
+rejected. Provider, model, custom endpoint, context, delays, timeout and previews
+remain independently configurable.
+
+XML preservation choices are whole-file refresh (default), `--missing-only`
+(fill missing resources) or `--skip-existing` (skip complete valid files).
+The two preservation flags cannot be combined. Listing preservation remains
+skip-by-default with explicit `--overwrite`. Preview flags can combine with any
+valid mode and still use the provider for newly generated translations.
+No setup, config file or language file is mandatory for existing commands.
+`fix` and `verify` still use `--res-dir`; point them at a separate XML output
+directory after placing the intended default source at `values/strings.xml` there.
+
+Manual check: reuse one language file with both commands, combine `all` with an
+extra locale and exclusions, preview before saving, and confirm existing files
+are retained under the chosen preservation mode. Build the app and review the
+actual translations; local validation does not prove linguistic quality.
 
 ---
 
@@ -387,13 +581,13 @@ PRs with cross-platform fixes and test notes are especially appreciated.
 | Topic | Detail |
 |---|---|
 | **Platform testing** | I test on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
-| **Scope** | Reads `values/strings.xml` only. Strings, arrays and plurals within that file are checked; separate XML files are not scanned |
+| **Scope** | `translate` reads one XML source, defaulting to `values/strings.xml`; `--source` can select another file. Output remains `strings.xml` per locale, with no automatic scan of other XML files. `store-listing` translates a separate three-field JSON listing |
 | **Plurals** | Preserves source quantities and item structure; does not generate target-language plural categories. Review plural completeness for each language |
-| **Overwrite** | Normal runs refresh whole files. `--missing-only` retains existing resources but does not detect source changes |
+| **Overwrite** | `translate` refreshes whole files; `--missing-only` retains existing resources but does not detect source changes. `store-listing` skips existing files unless `--overwrite` is set |
 | **Folder scan** | Recognizes language-first and Android `b+` locale forms, with optional trailing qualifiers. MCC/MNC-prefixed resource folders are not scanned |
-| **Validation** | Requires source attributes, inline element order and formatting options to match. DTD/entity declarations are unsupported; checks do not replace Android compilation or language review |
-| **Large files** | One request per locale; no automatic batching or resume cache. Incomplete output is rejected |
-| **Network** | `translate` requires internet access to reach the LLM API (except local `custom` providers) |
+| **Validation** | XML checks require source attributes, inline element order and formatting options to match; DTD/entity declarations are unsupported. Listing checks cover structure and field limits. Checks do not replace Android compilation, language review or policy review |
+| **Large files** | `translate` sends one XML document per locale; no automatic batching or resume cache. Listings have bounded field lengths and may use correction requests. Incomplete provider output is rejected |
+| **Network** | `translate` and `store-listing` require access to the LLM API (local `custom` providers can work offline; disable update checks for fully offline use) |
 | **JDK** | `verify` requires `javac` on your PATH |
 
 ---
@@ -402,7 +596,7 @@ PRs with cross-platform fixes and test notes are especially appreciated.
 
 | Problem | What to try |
 |---|---|
-| `Could not find English strings.xml` | Check `--res-dir` points to your `res/` folder and `values/strings.xml` exists |
+| `Could not find source XML` | Check `--source`, or ensure `--res-dir` contains `values/strings.xml` |
 | `No locale directories found` | Add `--languages hi,es,fr` or create `values-<lang>/` folders manually |
 | API auth errors | Confirm your key env var or `--api-key` matches the `--provider` |
 | Resource validation fails | Read the named resource error; check source/target keys, attributes, placeholders and markup. Existing files are retained |

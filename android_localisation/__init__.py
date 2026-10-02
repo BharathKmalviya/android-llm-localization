@@ -1,5 +1,5 @@
 """
-android-localisation: Zero-dependency Android strings.xml translation using LLMs.
+android-localisation: Zero-dependency Android XML and Play listing translation using LLMs.
 """
 
-__version__ = "1.1.3"
+__version__ = "1.5.0"
