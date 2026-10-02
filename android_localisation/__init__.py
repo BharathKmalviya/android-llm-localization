@@ -2,4 +2,4 @@
 android-localisation: Zero-dependency Android XML and Play listing translation using LLMs.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"

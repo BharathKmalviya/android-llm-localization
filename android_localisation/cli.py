@@ -50,7 +50,8 @@ Update notices: set ANDROID_LOCALISE_NO_UPDATE_CHECK=1 to disable them.""",
         "translate", help="Translate strings.xml into selected or existing locales",
         description="""Translate values/strings.xml using the selected provider and app context.
 Output is validated before saving. Existing locale files are refreshed by
-default; --missing-only preserves existing resources and fills missing ones.""",
+default; --missing-only preserves existing resources and fills missing ones.
+Use --skip-existing to skip reviewed files, or --source/--output-dir for custom paths.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   android-localise translate --languages all
@@ -59,12 +60,15 @@ default; --missing-only preserves existing resources and fills missing ones.""",
   android-localise translate --languages hi --missing-only --dry-run
   android-localise translate --provider custom --model YOUR_LOCAL_MODEL --base-url http://localhost:11434/v1/chat/completions
 
-Source: RES_DIR/values/strings.xml. Existing locale folders are used when
---languages is omitted. --dry-run may incur API charges.
+Source: RES_DIR/values/strings.xml unless --source is set. Existing destination
+locale folders are used when --languages and --languages-file are omitted.
+Combine all/custom languages and exclusions. --dry-run may incur API charges.
 Exit codes: 0 success, 1 setup/API/validation/save failure, 2 invalid arguments.
 Use android-localise models to see current defaults and fallbacks.""",
     )
     translate_parser.add_argument("--res-dir", default="app/src/main/res", help="Path to the Android res/ directory (default: app/src/main/res)")
+    from android_localisation.translate import add_flexible_arguments
+    add_flexible_arguments(translate_parser)
     translate_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
     translate_parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
     translate_parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
@@ -76,7 +80,7 @@ Use android-localise models to see current defaults and fallbacks.""",
         "--timeout", type=float, default=DEFAULT_API_TIMEOUT,
         help=f"Seconds to wait for each API response, up to {MAX_TIMEOUT_RETRIES + 1} attempts on timeout (default: {DEFAULT_API_TIMEOUT})",
     )
-    translate_parser.add_argument("--languages", help="'all' for 86 bundled locales, or comma-separated Android locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
+    translate_parser.add_argument("--languages", help="Comma-separated Android or Play tags and/or 'all' (hi,es-ES,b+zh+Hans,all,zu)")
     translate_parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     translate_parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
 

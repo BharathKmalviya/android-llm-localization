@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] - 2026-10-02
+
+### Added
+- Composable translation commands: combine `all` and manual languages, reuse UTF-8 `--languages-file` lists and apply `--exclude-languages` after selection. Listing translation can use a language file instead of `--languages`. Stable ordering and duplicate removal are retained.
+- XML translation accepts conventional language tags alongside Android qualifiers, deduplicating equivalent folder forms. `--source`, `--source-language` and `--output-dir` support other XML source paths/languages and separate output directories. `--skip-existing` validates and skips existing files; current whole-file refresh and missing-only defaults remain.
+
+### Fixed
+- Reject source/output collisions, including linked files, before XML translation can overwrite its input. Empty or invalid language selections fail before requests or folder creation; incompatible XML preservation flags are reported.
+
+---
+
 ## [1.4.0] - 2026-10-02
 
 ### Added

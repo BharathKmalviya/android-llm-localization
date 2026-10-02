@@ -11,16 +11,15 @@ import time
 import unicodedata
 
 from android_localisation.resources import atomic_write
-from android_localisation.locales import GOOGLE_PLAY_LOCALES
+from android_localisation.locales import (
+    GOOGLE_PLAY_LOCALES, language_items, normalize_play_locale, select_locales,
+)
 from android_localisation.translate import (
     DEFAULT_API_TIMEOUT, MAX_TIMEOUT_RETRIES, PROVIDER_MODELS, _call_provider,
 )
 
 FIELD_LIMITS = {"app_name": 30, "short_description": 80, "full_description": 4000}
 MAX_VALIDATION_RETRIES = 2
-LOCALE_PATTERN = re.compile(
-    r"([A-Za-z]{2,3})(?:-([A-Za-z]{4}))?(?:-([A-Za-z]{2}|[0-9]{3}))?\Z"
-)
 PLAY_GUIDANCE = """Google Play publishing guidance (reference only, never listing copy):
 Check the [metadata policy](https://play.google.com/about/storelisting-promotional/metadata)
 and [Help Centre guidance](https://support.google.com/googleplay/android-developer/answer/9866151)
@@ -38,7 +37,9 @@ never claim notice was sent, permission was granted, or Google approved the app.
 def add_arguments(parser):
     """Share options between the unified CLI and this module's parser."""
     parser.add_argument("--source", required=True, help="UTF-8 JSON with app_name, short_description and full_description")
-    parser.add_argument("--languages", required=True, help="'all' for all {} bundled Play locales, or comma-separated codes, e.g. hi-IN,es-ES,pt-BR".format(len(GOOGLE_PLAY_LOCALES)))
+    parser.add_argument("--languages", help="Comma-separated Play tags and/or 'all', e.g. all,zu or hi-IN,es-ES")
+    parser.add_argument("--languages-file", help="UTF-8 comma/newline language list; combines with --languages")
+    parser.add_argument("--exclude-languages", help="Comma-separated Play tags to exclude after selection")
     parser.add_argument("--source-language", default="en-US", help="Source listing locale (default: en-US)")
     parser.add_argument("--output-dir", default="store-listings", help="Directory for LOCALE.json files (default: store-listings)")
     parser.add_argument("--keep-app-name", action="store_true", help="Keep the source app name exactly in every translation")
@@ -62,23 +63,7 @@ def _parse_args(args=None):
 
 
 def parse_languages(value):
-    if value.strip().lower() == "all":
-        return list(GOOGLE_PLAY_LOCALES)
-    locales = []
-    for item in value.split(","):
-        if item.strip().lower() == "all":
-            raise ValueError("use --languages all alone, or specify a comma-separated locale list")
-        match = LOCALE_PATTERN.fullmatch(item.strip())
-        if not match:
-            raise ValueError("invalid Play locale: {!r}; use hi, es-ES or zh-TW, not Android folder names".format(item))
-        language, script, region = match.groups()
-        locale = "-".join(part for part in (
-            language.lower(), script.title() if script else None,
-            region.upper() if region else None,
-        ) if part)
-        if locale not in locales:
-            locales.append(locale)
-    return locales
+    return select_locales(value.split(","), normalize_play_locale, GOOGLE_PLAY_LOCALES)
 
 
 def _unique_object(pairs):
@@ -172,10 +157,14 @@ def main(args=None):
     try:
         if not math.isfinite(args.sleep) or args.sleep < 0 or not math.isfinite(args.timeout) or args.timeout <= 0:
             raise ValueError("--sleep must be finite and nonnegative; --timeout must be finite and positive")
-        locales = parse_languages(args.languages)
-        source_locales = parse_languages(args.source_language)
-        if len(source_locales) != 1 or "," in args.source_language:
-            raise ValueError("--source-language must be one locale")
+        items = language_items(args.languages, getattr(args, "languages_file", None))
+        if not items:
+            raise ValueError("choose --languages, --languages-file, or both")
+        locales = select_locales(items, normalize_play_locale, GOOGLE_PLAY_LOCALES,
+                                language_items(getattr(args, "exclude_languages", None)))
+        if not locales:
+            raise ValueError("no languages remain after selection/exclusions")
+        source_locales = [normalize_play_locale(args.source_language)]
         with open(args.source, "r", encoding="utf-8-sig") as handle:
             source = validate_listing(parse_listing(handle.read()))
         paths = [os.path.join(args.output_dir, locale + ".json") for locale in locales]
