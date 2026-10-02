@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] - 2026-10-02
+
+### Added
+- `store-listing` translates a UTF-8 JSON Google Play app name, short description and full description into selected Play locales, using existing providers, key resolution, pinned models, fallback and timeout behavior.
+- Validates all three required fields against 30/80/4,000-character limits and rejects invalid JSON, duplicate/extra/missing keys, blank fields, control characters and multiline names/short descriptions. Invalid model output receives up to two correction requests with feedback; rejected output leaves existing files intact.
+- Atomic per-locale JSON saves, field character counts, per-locale results, nonzero failure exits, and source/output collision protection. Existing valid listings skip by default; `--overwrite` refreshes them, `--dry-run` previews diffs, and `--keep-app-name` preserves the source name exactly.
+- Store-listing prompts incorporate the supplied metadata, Help Centre, programme-policy and advance-notice links with accurate-description and short-description guidance. They preserve factual disclosures and discourage invented claims, ranking/promotion language, keyword stuffing and misleading affiliations. Policy guidance remains a prompt instruction and manual review responsibility; the CLI does not upload listings or send advance notice.
+
+---
+
 ## [1.1.3] - 2026-10-02
 
 ### Added

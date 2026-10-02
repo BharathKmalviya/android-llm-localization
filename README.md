@@ -6,7 +6,7 @@
 
 **PyPI:** [`android-localisation`](https://pypi.org/project/android-localisation/) · **CLI:** `android-localise` · **Repo:** [android-llm-localization](https://github.com/BharathKmalviya/android-llm-localization)
 
-Translate your Android `strings.xml` into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama. No paid translation service, no CSV exports, no copy-paste.
+Translate your Android `strings.xml` and Google Play store listing into multiple languages using AI — Gemini, OpenAI, Anthropic, or a local model via Ollama.
 
 ---
 
@@ -149,6 +149,7 @@ typical workflow. Each command has detailed help with its options and examples:
 
 ```bash
 android-localise translate --help
+android-localise store-listing --help
 android-localise fix --help
 android-localise verify --help
 android-localise models --help
@@ -198,6 +199,100 @@ android-localise translate --languages hi --missing-only --dry-run
 `--dry-run` still calls the selected provider and may incur API charges. It is a translation preview, not a no-network estimate. `--missing-only` keeps existing resources, comments and text, but validates them against the current source first. An invalid existing file is reported rather than silently repaired. It does not detect changed English text for an existing key; use the normal translation mode when you deliberately want to refresh those resources. Arrays and plurals count as whole resources: this mode does not fill individual missing items.
 
 Validation permits positional placeholder reordering such as `%s %d` becoming `%2$d %1$s`, while checking argument identities, conversions, formatting options and occurrence counts. Non-translatable resources may be omitted from locale files to use Android's default fallback, but must remain unchanged if included.
+
+---
+
+### `store-listing`
+
+Translate an existing Google Play listing's **app name**, **short description**
+and **full description**, using the same providers, keys, model defaults,
+model-not-found fallbacks and timeout handling as `translate`.
+
+Create a UTF-8 `listing.json` containing exactly these three nonempty strings:
+
+```json
+{
+  "app_name": "Pocket Notes",
+  "short_description": "Write and organize your notes",
+  "full_description": "Write notes and organize them in folders.\n\nFind saved notes with search."
+}
+```
+
+Use your actual app details. JSON represents paragraph breaks as `\n`; this
+command translates supplied copy and does not infer features from Android XML.
+
+```bash
+android-localise store-listing --source listing.json --languages hi,es-ES,pt-BR
+# Keep the original brand/app name and preview translations
+android-localise store-listing --source listing.json --languages ja,zh-TW --keep-app-name --dry-run
+# Explicitly refresh reviewed files when the source changes
+android-localise store-listing --source listing.json --languages hi --overwrite
+```
+
+Outputs are readable UTF-8 `store-listings/hi.json`, `store-listings/es-ES.json`,
+etc., with the same three keys. Review the text and copy each field into its
+language's Play Console listing; JSON is a local output format, not a Play
+Console import file. The CLI does not upload or publish a listing.
+
+| Flag | Description | Default |
+|---|---|---|
+| `--source` | UTF-8 JSON source listing | required |
+| `--languages` | Comma-separated Play language tags, e.g. `hi,es-ES,pt-BR,zh-TW` | required |
+| `--source-language` | Source listing language tag | `en-US` |
+| `--output-dir` | Directory for `LOCALE.json` output | `store-listings` |
+| `--keep-app-name` | Preserve the source app name exactly | off; name is localized with brand-preservation instructions |
+| `--overwrite` | Replace existing locale files after validation | off; existing valid files are skipped |
+| `--dry-run` | Generate, validate and display diffs without files/directories being written | off; API usage applies |
+| `--provider` | `gemini`, `openai`, `anthropic`, `custom` | `gemini` |
+| `--model` | Pin any supported model and disable fallbacks | provider default |
+| `--api-key` | Key, or provider-specific environment variable / `API_KEY` | environment |
+| `--base-url` | OpenAI-compatible endpoint; required for `custom` | provider endpoint |
+| `--app-context` | Terminology context; source copy remains the source of facts | none |
+| `--sleep` | Delay between requests, including correction/fallback requests | `5.0` seconds |
+| `--timeout` | Per-response timeout; up to three attempts on timeout | `180` seconds |
+
+**Validation:** source and translated fields must fit **30 / 80 / 4,000 characters**
+respectively, as specified in [Google Play's product details guidance](https://support.google.com/googleplay/android-developer/answer/9859152).
+Counts use Python Unicode code points, including spaces, punctuation, newlines
+and any HTML markup, rather than UTF-8 bytes or visual glyphs. Check final counts
+in Play Console too. Names and short descriptions must be single-line text.
+Missing/extra/duplicate keys, blank fields, invalid JSON, unsupported controls
+and unpaired surrogates are rejected. Overlong or otherwise invalid model output
+gets up to **two correction requests**, with validation feedback; this can incur
+additional API usage. Text is never blindly truncated. After validation the
+complete listing is saved atomically. Rejected output preserves existing files;
+other languages continue and any failure produces exit code 1.
+
+Existing files are validated and skipped without translation API calls unless
+`--overwrite` is set, including during a dry run. An invalid existing file fails
+instead of being silently replaced; `--overwrite` explicitly regenerates it.
+`--dry-run --overwrite` previews changes to existing files. Source/output path
+collisions are rejected. Locale tags are syntax-checked and normalized (for
+example `pt-br` becomes `pt-BR`); duplicate tags run once. This does not check
+Google Play's supported-language catalog. Choose tags available in your Console;
+Android forms such as `values-hi`, `es-rES` and `b+zh+Hans` are not accepted here.
+
+**Translation prompt:** includes the supplied [metadata policy](https://play.google.com/about/storelisting-promotional/metadata),
+[Help Centre guidance](https://support.google.com/googleplay/android-developer/answer/9866151),
+[programme policies](https://play.google.com/about/developer-content-policy) and
+[advance-notice guidance](https://support.google.com/googleplay/android-developer/answer/6320428)
+as publishing references, alongside text guidance reviewed on **2026-10-02**.
+It asks for accurate, natural descriptions without invented claims, keyword
+stuffing, misleading affiliations or anonymous testimonials. App names and
+short descriptions avoid ranking/promotion language and decorative emoji;
+short descriptions also avoid calls to action. Existing factual limitations,
+URLs, brand names, required disclosures and full-description markup should be
+preserved. Unsupported promotional wording should become factual copy.
+These semantic rules are prompt instructions, not automated policy checks.
+No policy pages are fetched by the CLI at runtime, so review the current linked
+policies and translated claims before submitting. Advance notice remains a
+separate developer step if eligible; no notice, permission or approval is implied.
+
+**Manual check:** translate two languages, review all three fields with a native
+speaker and check their counts in Play Console. Rerun to confirm existing files
+skip, then use `--overwrite --dry-run` to review refreshes without saving.
+Try a source name longer than 30 characters to confirm rejection before any
+translation request.
 
 ---
 
@@ -387,13 +482,13 @@ PRs with cross-platform fixes and test notes are especially appreciated.
 | Topic | Detail |
 |---|---|
 | **Platform testing** | I test on **Windows only** — macOS and Linux need community verification (see [Platform support](#platform-support)) |
-| **Scope** | Reads `values/strings.xml` only. Strings, arrays and plurals within that file are checked; separate XML files are not scanned |
+| **Scope** | `translate` reads `values/strings.xml` only. `store-listing` translates a separate three-field JSON listing; no screenshots, uploads or automatic feature discovery |
 | **Plurals** | Preserves source quantities and item structure; does not generate target-language plural categories. Review plural completeness for each language |
-| **Overwrite** | Normal runs refresh whole files. `--missing-only` retains existing resources but does not detect source changes |
+| **Overwrite** | `translate` refreshes whole files; `--missing-only` retains existing resources but does not detect source changes. `store-listing` skips existing files unless `--overwrite` is set |
 | **Folder scan** | Recognizes language-first and Android `b+` locale forms, with optional trailing qualifiers. MCC/MNC-prefixed resource folders are not scanned |
-| **Validation** | Requires source attributes, inline element order and formatting options to match. DTD/entity declarations are unsupported; checks do not replace Android compilation or language review |
-| **Large files** | One request per locale; no automatic batching or resume cache. Incomplete output is rejected |
-| **Network** | `translate` requires internet access to reach the LLM API (except local `custom` providers) |
+| **Validation** | XML checks require source attributes, inline element order and formatting options to match; DTD/entity declarations are unsupported. Listing checks cover structure and field limits. Checks do not replace Android compilation, language review or policy review |
+| **Large files** | `translate` sends one XML document per locale; no automatic batching or resume cache. Listings have bounded field lengths and may use correction requests. Incomplete provider output is rejected |
+| **Network** | `translate` and `store-listing` require access to the LLM API (local `custom` providers can work offline; disable update checks for fully offline use) |
 | **JDK** | `verify` requires `javac` on your PATH |
 
 ---

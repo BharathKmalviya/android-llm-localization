@@ -3,6 +3,7 @@ Unified CLI entry point for android-localisation.
 
 Usage:
     android-localise translate --api-key KEY
+    android-localise store-listing --source listing.json --languages hi,es-ES
     android-localise fix
     android-localise verify
     android-localise models
@@ -19,7 +20,7 @@ def main(args=None):
             stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(
         prog="android-localise",
-        description="Zero-dependency Android strings.xml localization using LLMs.",
+        description="Zero-dependency Android strings.xml and Google Play listing localization using LLMs.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Typical workflow:
   android-localise translate --languages hi,es --app-context "a notes app"
@@ -27,6 +28,7 @@ def main(args=None):
   android-localise verify
 
 Other examples:
+  android-localise store-listing --source listing.json --languages hi,es-ES
   android-localise translate --languages hi --missing-only --dry-run
   android-localise models --provider openai
   python -m android_localisation setup-path          (Windows, one-time)
@@ -74,6 +76,27 @@ Use android-localise models to see current defaults and fallbacks.""",
     translate_parser.add_argument("--languages", help="Comma-separated locales (hi,es-rES,b+zh+Hans); folders are created after valid output")
     translate_parser.add_argument("--missing-only", action="store_true", help="Translate missing resources while retaining existing translations")
     translate_parser.add_argument("--dry-run", action="store_true", help="Generate and validate translations, then show a diff without writing files (API usage applies)")
+
+    # --- store-listing ---
+    from android_localisation.store_listing import add_arguments
+    listing_parser = subparsers.add_parser(
+        "store-listing", help="Translate Google Play app name and descriptions",
+        description="""Translate a UTF-8 JSON listing into selected Google Play languages.
+Validates required fields and 30/80/4000 character limits before atomic saves.
+Existing files are skipped unless --overwrite is set. Review policy compliance
+and translation quality before submitting to Google Play.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise store-listing --source listing.json --languages hi,es-ES
+  android-localise store-listing --source listing.json --languages ja --keep-app-name --dry-run
+  android-localise store-listing --source listing.json --languages pt-BR --overwrite
+
+JSON keys: app_name, short_description, full_description (all required strings).
+Outputs: OUTPUT_DIR/LOCALE.json. Use Play locales, not Android values- folders.
+Invalid model output gets up to two correction requests (API usage applies).
+Exit codes: 0 success, 1 setup/API/validation/save failure, 2 invalid arguments.""",
+    )
+    add_arguments(listing_parser)
 
     # --- fix ---
     fix_parser = subparsers.add_parser(
@@ -158,6 +181,10 @@ def _run_command(args):
 
     elif args.command == "translate":
         from android_localisation.translate import main as run
+        return run(args)
+
+    elif args.command == "store-listing":
+        from android_localisation.store_listing import main as run
         return run(args)
 
     elif args.command == "fix":
