@@ -99,6 +99,10 @@ When you run `android-localise translate --api-key YOUR_KEY`, here's exactly wha
 4. Parses the response and checks duplicate/unexpected/missing resources, attributes, inline markup, item structure, control escapes and format arguments. A valid result replaces the file atomically; new folders are created only when saving. `--skip-existing` validates existing files and skips them without API calls. `--dry-run` shows a diff without writing any files or creating folders
 5. Waits 5 seconds between each language request to avoid hitting API rate limits
 
+Keys resolve from `--api-key`, then provider environment variables / `API_KEY`,
+then saved Windows credentials for built-in provider endpoints. The CLI never
+prompts for a key during translation; use `credentials set` yourself beforehand.
+
 **Defaults used when you don't specify anything:**
 
 | What | Default |
@@ -198,7 +202,7 @@ android-localise translate \
 
 | Flag | What it does | Default |
 |---|---|---|
-| `--api-key` | Your API key | reads from env var |
+| `--api-key` | Explicit key override; omit for environment or saved Windows credentials | environment, then saved Windows key |
 | `--provider` | Which AI to use: `gemini` `openai` `anthropic` `custom` | `gemini` |
 | `--model` | Specific model to use | see [Providers](#providers) |
 | `--languages` | Comma-separated Android/conventional codes and/or `all`, e.g. `all,zu` or `hi,es-ES,b+es+419` | scan existing destination locale folders |
@@ -277,7 +281,7 @@ Console import file. The CLI does not upload or publish a listing.
 | `--dry-run` | Generate, validate and display diffs without files/directories being written | off; API usage applies |
 | `--provider` | `gemini`, `openai`, `anthropic`, `custom` | `gemini` |
 | `--model` | Pin any supported model and disable fallbacks | provider default |
-| `--api-key` | Key, or provider-specific environment variable / `API_KEY` | environment |
+| `--api-key` | Explicit key override; omit for environment or saved Windows credentials | environment, then saved Windows key |
 | `--base-url` | OpenAI-compatible endpoint; required for `custom` | provider endpoint |
 | `--app-context` | Terminology context; source copy remains the source of facts | none |
 | `--sleep` | Delay between requests, including correction/fallback requests | `5.0` seconds |
@@ -497,9 +501,72 @@ android-localise translate \
 
 ---
 
+## Save a key once on Windows
+
+Run this yourself in your terminal:
+
+```bash
+android-localise credentials set --provider gemini
+```
+
+Enter your key at the hidden prompt. It is stored in **Windows Credential
+Manager**, for your Windows user on this computer, and persists across terminal
+and computer restarts. The CLI does not write a plaintext key file or modify
+environment variables. Running `set` again replaces that provider's saved key.
+There is no key argument or piped-input option for this command; it requires an
+interactive terminal and refuses a prompt that cannot hide input.
+
+Then you or an AI assistant can run ordinary commands without including a key:
+
+```bash
+android-localise translate --languages hi,es
+android-localise store-listing --source listing.json --languages hi-IN,es-ES
+android-localise credentials status --provider gemini
+android-localise credentials remove --provider gemini
+```
+
+`status` reports only `saved` or `not saved`; no command displays the saved value.
+`remove` deletes only this CLI's saved entry for that provider; it does not revoke
+the provider key or clear environment-variable overrides. The same commands also
+work with `python -m android_localisation credentials ...`.
+
+| Argument | Description | Default |
+|---|---|---|
+| `set`, `status`, `remove` | Hidden entry, presence check, or deletion | required action |
+| `--provider` | `gemini`, `openai` or `anthropic` | `gemini` |
+
+Both translation commands use this precedence: `--api-key` → provider-specific
+environment variable → `API_KEY` → saved Windows key. Existing overrides retain
+their behavior; if an old environment key is set, saving a new key does not
+override it. Saved OpenAI keys load only for its default endpoint; `custom`
+providers and other `--base-url` endpoints continue using explicit keys or
+environment variables. Saved keys are not automatically sent to custom hosts.
+Provider requests reject HTTP redirects, so use a custom endpoint's final URL.
+Gemini authentication uses a header rather than a URL query parameter, and
+API/network error messages redact the key used for that request before display.
+
+This keeps keys out of chat, command arguments and routine CLI output. It
+**does not isolate secrets from an AI or other program with unrestricted access
+under your Windows account**: Windows permits programs running as that user to
+read their credentials. The key is also present in memory during an API request.
+For stronger separation, use a restricted runner or separately secured proxy.
+See [Microsoft's credential API documentation](https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credreadw).
+
+Saved-key commands are Windows-only, with no plaintext fallback. Other platforms
+keep using environment variables or `--api-key`.
+
+Manual check: save a key yourself, confirm input is hidden, open a new terminal
+and check `status`. Run a small XML and listing preview without `--api-key`,
+review the output, then remove the entry and confirm `not saved`. Ensure any key
+environment overrides are absent when checking saved-key behavior.
+
+---
+
 ## Environment variables
 
-Set your API key as an env variable so you don't have to pass it every time:
+Environment variables remain available on all platforms. For Windows saved
+credentials, use the commands above instead of putting a key in shell history.
+To use an environment variable:
 
 ```bash
 # macOS / Linux

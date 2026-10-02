@@ -5,6 +5,7 @@ import socket
 import argparse
 import urllib.request
 import urllib.error
+import urllib.parse
 import json
 import math
 import difflib
@@ -22,6 +23,7 @@ from android_localisation.resources import (
 from android_localisation.locales import (
     all_android_locales, android_locale, language_items, normalize_play_locale, select_locales,
 )
+from android_localisation.credentials import resolve_api_key
 
 DEFAULT_RES_DIR = "app/src/main/res"
 DEFAULT_API_TIMEOUT = 180  # seconds (3 minutes) — large strings.xml files can exceed 60s
@@ -148,7 +150,7 @@ def clean_xml_response(result):
 
 def _read_error_body(e):
     try:
-        return e.read().decode("utf-8", errors="replace")[:500]
+        return e.read().decode("utf-8", errors="replace")
     except Exception:
         return "(could not read error body)"
 
@@ -173,27 +175,43 @@ def _is_timeout_error(exc):
     )
 
 
-def _urlopen_with_retries(req, provider_label, timeout):
+def _redact_error(value, api_key):
+    text = str(value)
+    if api_key:
+        for secret in sorted({api_key, urllib.parse.quote(api_key, safe=""),
+                              urllib.parse.quote_plus(api_key), json.dumps(api_key)[1:-1]},
+                             key=len, reverse=True):
+            text = text.replace(secret, "[REDACTED]")
+    return text[:500]
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # Do not forward authentication headers to redirect targets.
+
+
+def _urlopen_with_retries(req, provider_label, timeout, api_key=None):
     """
     Execute an HTTP request with timeout/network error handling and retries on timeout.
     Returns (response_bytes, model_not_found).
     """
+    opener = urllib.request.build_opener(_NoRedirect())
     for attempt in range(MAX_TIMEOUT_RETRIES + 1):
         if attempt > 0:
             wait = attempt * 3
             print(f"  🔁 {provider_label} timed out — retrying ({attempt}/{MAX_TIMEOUT_RETRIES}) in {wait}s...")
             time.sleep(wait)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            with opener.open(req, timeout=timeout) as response:
                 return response.read(), False
         except urllib.error.HTTPError as e:
             body = _read_error_body(e)
             model_gone = _is_model_not_found(e.code, body)
-            print(f"  ❌ {provider_label} API Error: {e.code} - {body}")
+            print(f"  ❌ {provider_label} API Error: {e.code} - {_redact_error(body, api_key)}")
             return None, model_gone
         except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
             if not _is_timeout_error(e):
-                print(f"  ❌ {provider_label} network error: {e.reason}")
+                print(f"  ❌ {provider_label} network error: {_redact_error(e.reason, api_key)}")
                 return None, False
             if attempt < MAX_TIMEOUT_RETRIES:
                 continue
@@ -203,11 +221,11 @@ def _urlopen_with_retries(req, provider_label, timeout):
 
 
 def call_gemini(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    raw, model_gone = _urlopen_with_retries(req, "Gemini", timeout)
+    raw, model_gone = _urlopen_with_retries(req, "Gemini", timeout, api_key)
     if raw is None:
         return None, model_gone
     result = json.loads(raw.decode("utf-8"))
@@ -217,7 +235,7 @@ def call_gemini(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
         return None, False
     candidate = candidates[0]
     if candidate.get("finishReason") not in (None, "STOP"):
-        print("  ❌ Gemini response was incomplete or blocked: {}".format(candidate.get("finishReason")))
+        print("  ❌ Gemini response was incomplete or blocked: {}".format(_redact_error(candidate.get("finishReason"), api_key)))
         return None, False
     return "".join(part.get("text", "") for part in candidate.get("content", {}).get("parts", [])
                    if not part.get("thought")), False
@@ -233,7 +251,7 @@ def call_openai_compatible(api_key, base_url, model, prompt, timeout=DEFAULT_API
         "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(base_url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    raw, model_gone = _urlopen_with_retries(req, "OpenAI (compatible)", timeout)
+    raw, model_gone = _urlopen_with_retries(req, "OpenAI (compatible)", timeout, api_key)
     if raw is None:
         return None, model_gone
     result = json.loads(raw.decode("utf-8"))
@@ -242,7 +260,7 @@ def call_openai_compatible(api_key, base_url, model, prompt, timeout=DEFAULT_API
         print("  ❌ OpenAI returned no choices.")
         return None, False
     if choices[0].get("finish_reason") not in (None, "stop"):
-        print("  ❌ OpenAI-compatible response was incomplete: {}".format(choices[0].get("finish_reason")))
+        print("  ❌ OpenAI-compatible response was incomplete: {}".format(_redact_error(choices[0].get("finish_reason"), api_key)))
         return None, False
     return choices[0].get("message", {}).get("content", ""), False
 
@@ -260,7 +278,7 @@ def call_anthropic(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
         "messages": [{"role": "user", "content": prompt}],
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-    raw, model_gone = _urlopen_with_retries(req, "Anthropic", timeout)
+    raw, model_gone = _urlopen_with_retries(req, "Anthropic", timeout, api_key)
     if raw is None:
         return None, model_gone
     result = json.loads(raw.decode("utf-8"))
@@ -269,7 +287,7 @@ def call_anthropic(api_key, model, prompt, timeout=DEFAULT_API_TIMEOUT):
         print("  ❌ Anthropic returned no content.")
         return None, False
     if result.get("stop_reason") not in (None, "end_turn"):
-        print("  ❌ Anthropic response was incomplete: {}".format(result.get("stop_reason")))
+        print("  ❌ Anthropic response was incomplete: {}".format(_redact_error(result.get("stop_reason"), api_key)))
         return None, False
     return "".join(block.get("text", "") for block in content if block.get("type") == "text"), False
 
@@ -327,7 +345,7 @@ def _parse_args(args=None):
     add_flexible_arguments(parser)
     parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
     parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
-    parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
+    parser.add_argument("--api-key", help="API key; otherwise use provider environment variable / API_KEY, then saved Windows key")
     parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
     parser.add_argument("--app-context", help="Short description of your app for better translations")
     parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
@@ -382,16 +400,14 @@ def main(args=None):
         fallback_models = model_list[1:]
 
     # Resolve API key
-    api_key = args.api_key
-    if not api_key:
-        if provider == "gemini":                  api_key = os.environ.get("GEMINI_API_KEY")
-        elif provider in ("openai", "custom"):    api_key = os.environ.get("OPENAI_API_KEY")
-        elif provider == "anthropic":             api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            api_key = os.environ.get("API_KEY")
+    try:
+        api_key = resolve_api_key(provider, args.api_key, args.base_url)
+    except (OSError, ValueError) as exc:
+        print("❌ ERROR: {}".format(exc))
+        return 1
 
     if not api_key and provider != "custom":
-        print("❌ ERROR: Please provide an API key via --api-key or the appropriate environment variable.")
+        print("❌ ERROR: Provide --api-key, a provider environment variable, or save a Windows key with credentials set. Saved keys are not used with custom endpoints.")
         return 1
 
     if provider == "custom" and not args.base_url:

@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] - 2026-10-02
+
+### Added
+- Windows `credentials set`, `status` and `remove` commands for user-scoped API keys in Credential Manager. Key entry uses a hidden interactive prompt, with no key argument, piped input or plaintext fallback. Both translation commands automatically read saved Gemini/OpenAI/Anthropic keys after existing argument/environment overrides, enabling ordinary commands without key arguments.
+- Saved-key use is limited to built-in provider endpoints; custom/local endpoints retain explicit or environment credentials. Document the Windows account boundary: saved keys are not isolated from agents or programs with unrestricted access as that user.
+
+### Fixed
+- Send Gemini keys in an authentication header instead of the URL. Redact active keys from API/network diagnostics before truncation and reject provider-request redirects so authentication headers are not forwarded to another endpoint.
+
+---
+
 ## [1.5.0] - 2026-10-02
 
 ### Added
