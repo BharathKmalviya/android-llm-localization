@@ -28,6 +28,7 @@ def main(args=None):
   android-localise verify
 
 Other examples:
+  android-localise store-listing --source listing.json --languages all
   android-localise store-listing --source listing.json --languages hi,es-ES
   android-localise translate --languages hi --missing-only --dry-run
   android-localise models --provider openai
@@ -87,6 +88,7 @@ Existing files are skipped unless --overwrite is set. Review policy compliance
 and translation quality before submitting to Google Play.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
+  android-localise store-listing --source listing.json --languages all
   android-localise store-listing --source listing.json --languages hi,es-ES
   android-localise store-listing --source listing.json --languages ja --keep-app-name --dry-run
   android-localise store-listing --source listing.json --languages pt-BR --overwrite

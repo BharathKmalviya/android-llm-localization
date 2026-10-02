@@ -17,6 +17,17 @@ from android_localisation.translate import (
 
 FIELD_LIMITS = {"app_name": 30, "short_description": 80, "full_description": 4000}
 MAX_VALIDATION_RETRIES = 2
+# Store-listing locales (not Play Console UI or machine-translation languages).
+# Verified on 2026-10-02 against the "View list of available languages" section:
+# https://support.google.com/googleplay/android-developer/answer/9844778?hl=en
+GOOGLE_PLAY_LOCALES = tuple("""
+af sq am ar hy-AM az-AZ bn-BD eu-ES be bg my-MM ca zh-HK zh-CN zh-TW
+hr cs-CZ da-DK nl-NL en-AU en-CA en-US en-GB en-IN en-SG en-ZA et fil
+fi-FI fr-CA fr-FR gl-ES ka-GE de-DE el-GR gu iw-IL hi-IN hu-HU is-IS id
+it-IT ja-JP kn-IN kk km-KH ko-KR ky-KG lo-LA lv lt mk-MK ms-MY ms ml-IN
+mr-IN mn-MN ne-NP no-NO fa fa-AE fa-AF fa-IR pl-PL pt-BR pt-PT pa ro rm
+ru-RU sr si-LK sk sl es-419 es-ES es-US sw sv-SE ta-IN te-IN th tr-TR uk ur vi
+""".split())
 LOCALE_PATTERN = re.compile(
     r"([A-Za-z]{2,3})(?:-([A-Za-z]{4}))?(?:-([A-Za-z]{2}|[0-9]{3}))?\Z"
 )
@@ -37,7 +48,7 @@ never claim notice was sent, permission was granted, or Google approved the app.
 def add_arguments(parser):
     """Share options between the unified CLI and this module's parser."""
     parser.add_argument("--source", required=True, help="UTF-8 JSON with app_name, short_description and full_description")
-    parser.add_argument("--languages", required=True, help="Comma-separated Play locales, e.g. hi,es-ES,pt-BR,zh-TW")
+    parser.add_argument("--languages", required=True, help="'all' for all {} bundled Play locales, or comma-separated codes, e.g. hi-IN,es-ES,pt-BR".format(len(GOOGLE_PLAY_LOCALES)))
     parser.add_argument("--source-language", default="en-US", help="Source listing locale (default: en-US)")
     parser.add_argument("--output-dir", default="store-listings", help="Directory for LOCALE.json files (default: store-listings)")
     parser.add_argument("--keep-app-name", action="store_true", help="Keep the source app name exactly in every translation")
@@ -61,8 +72,12 @@ def _parse_args(args=None):
 
 
 def parse_languages(value):
+    if value.strip().lower() == "all":
+        return list(GOOGLE_PLAY_LOCALES)
     locales = []
     for item in value.split(","):
+        if item.strip().lower() == "all":
+            raise ValueError("use --languages all alone, or specify a comma-separated locale list")
         match = LOCALE_PATTERN.fullmatch(item.strip())
         if not match:
             raise ValueError("invalid Play locale: {!r}; use hi, es-ES or zh-TW, not Android folder names".format(item))

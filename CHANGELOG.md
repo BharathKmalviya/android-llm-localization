@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] - 2026-10-02
+
+### Added
+- `store-listing --languages all` selects all 86 Google Play store-listing locales from the official language list verified on 2026-10-02, including regional variants. The catalog ships with the CLI, without runtime lookups.
+- Manual comma-separated language selection remains available. `all` is case-insensitive and must be used alone; mixed all/manual lists are rejected. Existing skip, overwrite, preview, validation, retry and API-delay behavior applies to every selected locale.
+
+---
+
 ## [1.2.0] - 2026-10-02
 
 ### Added

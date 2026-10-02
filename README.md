@@ -222,6 +222,9 @@ Use your actual app details. JSON represents paragraph breaks as `\n`; this
 command translates supplied copy and does not infer features from Android XML.
 
 ```bash
+# Translate every bundled Google Play listing locale
+android-localise store-listing --source listing.json --languages all
+# Or select languages manually
 android-localise store-listing --source listing.json --languages hi,es-ES,pt-BR
 # Keep the original brand/app name and preview translations
 android-localise store-listing --source listing.json --languages ja,zh-TW --keep-app-name --dry-run
@@ -237,7 +240,7 @@ Console import file. The CLI does not upload or publish a listing.
 | Flag | Description | Default |
 |---|---|---|
 | `--source` | UTF-8 JSON source listing | required |
-| `--languages` | Comma-separated Play language tags, e.g. `hi,es-ES,pt-BR,zh-TW` | required |
+| `--languages` | `all` for every bundled Play locale, or comma-separated tags, e.g. `hi-IN,es-ES,pt-BR,zh-TW` | required |
 | `--source-language` | Source listing language tag | `en-US` |
 | `--output-dir` | Directory for `LOCALE.json` output | `store-listings` |
 | `--keep-app-name` | Preserve the source app name exactly | off; name is localized with brand-preservation instructions |
@@ -269,8 +272,20 @@ instead of being silently replaced; `--overwrite` explicitly regenerates it.
 `--dry-run --overwrite` previews changes to existing files. Source/output path
 collisions are rejected. Locale tags are syntax-checked and normalized (for
 example `pt-br` becomes `pt-BR`); duplicate tags run once. This does not check
-Google Play's supported-language catalog. Choose tags available in your Console;
+manual codes against Google Play's supported-language catalog. Choose tags available in your Console;
 Android forms such as `values-hi`, `es-rES` and `b+zh+Hans` are not accepted here.
+
+`--languages all` expands to the **86 store-listing locales** in
+[Google Play's available-language list](https://support.google.com/googleplay/android-developer/answer/9844778?hl=en),
+verified on **2026-10-02** and bundled with this release. It includes regional
+variants and the source locale if present in the list. It does not fetch or
+change the catalog at runtime. `all` is case-insensitive and must be used alone;
+`all,hi-IN` is rejected. Omitting `--languages` still requires you to choose
+`all` or a manual list. Manual selection retains existing normalization and
+duplicate removal. Each locale uses its own request, subject to existing-file
+skips, correction/fallback requests and the configured delay. API usage applies
+to all generated locales, including previews. Existing valid files still skip
+unless `--overwrite` is set.
 
 **Translation prompt:** includes the supplied [metadata policy](https://play.google.com/about/storelisting-promotional/metadata),
 [Help Centre guidance](https://support.google.com/googleplay/android-developer/answer/9866151),
@@ -293,6 +308,9 @@ speaker and check their counts in Play Console. Rerun to confirm existing files
 skip, then use `--overwrite --dry-run` to review refreshes without saving.
 Try a source name longer than 30 characters to confirm rejection before any
 translation request.
+For all-locale coverage, run `--languages all` into a separate output directory,
+confirm 86 successful JSON outputs, then rerun and confirm 86 skips. Use a manual
+list such as `hi-IN,es-ES` to confirm only those two outputs are generated.
 
 ---
 
