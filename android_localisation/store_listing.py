@@ -11,6 +11,7 @@ import time
 import unicodedata
 
 from android_localisation.resources import atomic_write
+from android_localisation.credentials import resolve_api_key
 from android_localisation.locales import (
     GOOGLE_PLAY_LOCALES, language_items, normalize_play_locale, select_locales,
 )
@@ -47,7 +48,7 @@ def add_arguments(parser):
     parser.add_argument("--dry-run", action="store_true", help="Generate and validate a diff without saving (API usage applies)")
     parser.add_argument("--provider", choices=list(PROVIDER_MODELS), default="gemini", help="AI provider (default: gemini)")
     parser.add_argument("--model", help="Pin a model and disable automatic fallbacks (default: provider default; see models)")
-    parser.add_argument("--api-key", help="API key, or provider-specific environment variable / API_KEY")
+    parser.add_argument("--api-key", help="API key; otherwise provider environment variable / API_KEY, then saved Windows key")
     parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint (required for custom provider)")
     parser.add_argument("--app-context", help="Short app description for terminology; listing remains the source of facts")
     parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between requests, including validation retries (default: 5.0)")
@@ -176,11 +177,9 @@ def main(args=None):
         if args.provider == "custom" and (not args.model or not args.base_url):
             raise ValueError("custom provider requires --model and --base-url")
         models = [args.model] if args.model else model_list
-        env_name = {"gemini": "GEMINI_API_KEY", "openai": "OPENAI_API_KEY",
-                    "anthropic": "ANTHROPIC_API_KEY", "custom": "OPENAI_API_KEY"}[args.provider]
-        api_key = args.api_key or os.environ.get(env_name) or os.environ.get("API_KEY")
+        api_key = resolve_api_key(args.provider, args.api_key, args.base_url)
         if not api_key and args.provider != "custom":
-            raise ValueError("provide --api-key or set {} / API_KEY".format(env_name))
+            raise ValueError("provide --api-key, a provider environment variable, or save a Windows key with credentials set; saved keys are not used with custom endpoints")
     except (OSError, ValueError, KeyError) as exc:
         print("ERROR: {}".format(exc))
         return 1

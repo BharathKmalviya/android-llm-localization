@@ -33,11 +33,12 @@ Other examples:
   android-localise store-listing --source listing.json --languages hi,es-ES
   android-localise translate --languages hi --missing-only --dry-run
   android-localise models --provider openai
+  android-localise credentials set --provider gemini (Windows, hidden prompt)
   python -m android_localisation setup-path          (Windows, one-time)
 
 Use android-localise COMMAND --help for flags, defaults and examples.
 All commands also work with: python -m android_localisation COMMAND
-Keys: GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or API_KEY.
+Keys: --api-key, environment variables, then saved Windows credentials.
 Update notices: set ANDROID_LOCALISE_NO_UPDATE_CHECK=1 to disable them.""",
     )
     parser.add_argument("--version", action="version", version=f"android-localisation {__version__}")
@@ -71,7 +72,7 @@ Use android-localise models to see current defaults and fallbacks.""",
     add_flexible_arguments(translate_parser)
     translate_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic", "custom"], default="gemini", help="AI provider (default: gemini)")
     translate_parser.add_argument("--model", help="Pin any supported model and disable fallbacks (default: provider default; see models)")
-    translate_parser.add_argument("--api-key", help="API key, or set GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / API_KEY")
+    translate_parser.add_argument("--api-key", help="API key; otherwise use provider environment variable / API_KEY, then saved Windows key")
     translate_parser.add_argument("--base-url", help="Custom OpenAI-compatible endpoint URL (required for 'custom' provider)")
     translate_parser.add_argument("--app-context", help="Short description of your app for better translations")
     translate_parser.add_argument("--sleep", type=float, default=5.0, help="Seconds between API requests (default: 5.0)")
@@ -151,6 +152,25 @@ Custom/local providers require an explicit --model.""",
     models_parser.add_argument("--provider", choices=["gemini", "openai", "anthropic"], default=None,
                                help="Filter by provider (shows all if not set)")
 
+    from android_localisation.credentials import add_arguments as add_credential_arguments
+    credentials_parser = subparsers.add_parser(
+        "credentials", help="Manage saved Windows API keys without displaying them",
+        description="""Save provider keys in Windows Credential Manager for your user account.
+Run set yourself in an interactive terminal; the key prompt is hidden.
+Status reports presence only. Translation commands load saved keys automatically
+after argument/environment overrides. This does not isolate keys from programs
+or AI agents with unrestricted access under your Windows account.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  android-localise credentials set --provider gemini
+  android-localise credentials status --provider gemini
+  android-localise credentials remove --provider gemini
+
+No key argument, piped input or plaintext storage fallback is supported.
+Custom endpoints continue using explicit keys or environment variables.""",
+    )
+    add_credential_arguments(credentials_parser)
+
     subparsers.add_parser(
         "setup-path", help="Add the installed Scripts folder to Windows user PATH",
         description="""One-time Windows setup for an installed CLI that PowerShell cannot find.
@@ -183,7 +203,11 @@ Exit code 1 reports unsupported platforms, virtual environments or setup failure
 
 
 def _run_command(args):
-    if args.command == "setup-path":
+    if args.command == "credentials":
+        from android_localisation.credentials import main as run
+        return run(args)
+
+    elif args.command == "setup-path":
         from android_localisation.setup_path import main as run
         return run(args)
 
