@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.3] - 2026-10-05
+
+### Changed
+- Update Gemini's single automatic fallback to `gemini-3.8-flash` for XML and store listing translation, retaining `gemini-3.5-flash-lite` as the default. OpenAI remains `gpt-6-luna` → `gpt-5.6-terra`, and Anthropic remains `claude-haiku-4-5` → `claude-sonnet-5-5`. Explicit model selection and custom/local requirements remain unchanged.
+
+---
+
 ## [1.6.2] - 2026-10-05
 
 ### Changed

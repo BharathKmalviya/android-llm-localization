@@ -35,7 +35,7 @@ MAX_TIMEOUT_RETRIES = 2
 PROVIDER_MODELS = {
     "gemini": [
         "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
+        "gemini-3.8-flash",
     ],
     "openai": [
         "gpt-6-luna",
