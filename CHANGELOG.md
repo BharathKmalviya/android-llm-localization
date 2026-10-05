@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.1] - 2026-10-05
+
+### Changed
+- Set Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`) as the default for Android XML and Google Play store listing translation, using the requested model ID verified against Google's official documentation. Gemini has no automatic fallback; other provider defaults and explicit model overrides remain unchanged.
+
+---
+
 ## [1.6.0] - 2026-10-02
 
 ### Added

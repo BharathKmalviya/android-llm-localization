@@ -32,10 +32,11 @@ MAX_TIMEOUT_RETRIES = 2
 # Ordered list of models per provider.
 # First entry = default. Rest = automatic fallbacks (used only when user hasn't pinned a model).
 # Latest text-model lineup checked against official catalogs on 2026-10-02.
+# Gemini Flash-Lite default selected by the user; model ID checked on 2026-10-05.
 # Do not add older-generation models as automatic fallbacks.
 PROVIDER_MODELS = {
     "gemini": [
-        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
     ],
     "openai": [
         "gpt-6-luna",
