@@ -108,7 +108,7 @@ prompts for a key during translation; use `credentials set` yourself beforehand.
 | What | Default |
 |---|---|
 | Provider | Gemini |
-| Model | `gemini-3.8-flash` |
+| Model | `gemini-3.5-flash-lite` |
 | Source directory | `app/src/main/res` |
 | Delay between requests | 5 seconds |
 | App context | none (generic prompt) |
@@ -456,18 +456,18 @@ environment behavior. All commands can also run through `python -m android_local
 
 ## Providers
 
-By default the tool uses Gemini with `gemini-3.8-flash`. You can switch providers with `--provider` and optionally pin a specific model with `--model`. Configured defaults and fallbacks use only the latest general-purpose text-model lineup, with defaults favoring speed and cost within that lineup.
+By default the tool uses Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`) for both XML and store listing translation. You can switch providers with `--provider` and optionally pin a specific model with `--model`.
 
-| Provider | Default model | Fallbacks | API key env var |
+| Provider | Default model | Fallback | API key env var |
 |---|---|---|---|
-| `gemini` _(default)_ | `gemini-3.8-flash` | none | `GEMINI_API_KEY` |
-| `openai` | `gpt-6-luna` | `gpt-6.1-sol` → `gpt-6-astra` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-sonnet-5-5` | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
+| `gemini` _(default)_ | `gemini-3.5-flash-lite` | `gemini-3.5-flash` | `GEMINI_API_KEY` |
+| `openai` | `gpt-6-luna` | `gpt-5.6-terra` | `OPENAI_API_KEY` |
+| `anthropic` | `claude-haiku-4-5` | `claude-sonnet-5-5` | `ANTHROPIC_API_KEY` |
 | `custom` | set with `--model` | none | `OPENAI_API_KEY` (optional) |
 
-If the default model returns a "model not found" error (e.g. it was deprecated), the tool automatically retries with the next fallback. If you pin a model with `--model`, no fallback is used.
+Each hosted provider has exactly one automatic fallback. If the default model returns a "model not found" error (e.g. it was deprecated), the tool retries with that fallback. Authentication, quota and network errors do not trigger a model fallback. If you pin a model with `--model`, no fallback is used.
 
-Model IDs and compatibility checked against [Google's model catalog](https://ai.google.dev/gemini-api/docs/models), [OpenAI's model catalog](https://developers.openai.com/api/docs/models) and [Anthropic's model catalog](https://platform.claude.com/docs/en/models/overview) on **2026-10-02**. Older Gemini, GPT-5 and Haiku 4.5 models are excluded from automatic selection. Gemini has no fallback in its latest stable text generation. OpenAI and Anthropic fallbacks are higher-cost models; pin `--model` to avoid automatic tier changes. Explicit model selection and custom/local endpoints remain available. The catalog is bundled with each CLI release, rather than automatically discovering models at runtime.
+These default/fallback pairs follow the selected configuration. Gemini model IDs were checked against [Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite) and [Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash) documentation; the OpenAI fallback against [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra); and Anthropic's default/fallback against its [model migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide) on **2026-10-05**. The existing OpenAI default was checked on **2026-10-02**. Pin `--model` to avoid automatic model changes. Explicit model selection and custom/local endpoints remain available. The catalog is bundled with each CLI release, rather than automatically discovering models at runtime.
 
 OpenAI and local providers retain the Chat Completions request format. Provider replies indicating truncation or blocked/incomplete output are rejected. Anthropic allows up to 16,384 output tokens per request and text blocks are collected separately from thinking blocks. Large files can still exceed a model's limits; automatic batching is future work.
 

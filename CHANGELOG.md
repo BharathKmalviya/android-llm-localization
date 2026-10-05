@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.2] - 2026-10-05
+
+### Changed
+- Apply the requested default/fallback pairs to XML and store listing translation: Gemini `gemini-3.5-flash-lite` → `gemini-3.5-flash`, OpenAI `gpt-6-luna` → `gpt-5.6-terra`, and Anthropic `claude-haiku-4-5` → `claude-sonnet-5-5`. Each hosted provider has exactly one automatic fallback for model-not-found errors. Explicit `--model` selection still disables fallbacks; custom/local providers still require it.
+
+---
+
+## [1.6.1] - 2026-10-05
+
+### Changed
+- Set Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`) as the default for Android XML and Google Play store listing translation, using the requested model ID verified against Google's official documentation. Gemini has no automatic fallback; other provider defaults and explicit model overrides remain unchanged.
+
+---
+
 ## [1.6.0] - 2026-10-02
 
 ### Added
